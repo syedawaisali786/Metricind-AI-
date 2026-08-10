@@ -1,31 +1,126 @@
 import { useState } from "react";
 
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+const API_URL = "http://localhost:5000";
+
+type QueryResponse = {
+  metric?: string;
+  value?: number;
+  message?: string;
+  data?:Record<string, unknown>[];
+  apiCall?: string;
+  sql?: string;
+  chartType?: "line" | "bar";
+};
+
 function Chat() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  const [apiCall, setApiCall] = useState("");
+  const [sql, setSql] = useState("");
+  const [chartData, setChartData] = useState<Record<string, unknown>[]>([]);
+  const [chartType, setChartType] = useState<
+    "line" | "bar" | ""
+  >("");
   const [loading, setLoading] = useState(false);
 
-  const askQuestion = () => {
+  const askQuestion = async () => {
     if (!question.trim()) return;
 
-    setAnswer("");
     setLoading(true);
+    setAnswer("");
+    setApiCall("");
+    setSql("");
+    setChartData([]);
+    setChartType("");
 
-    const response =
-      "Based on the available business data, revenue has increased due to stronger sales performance during the recent period.";
+    try {
+      const response = await fetch(`${API_URL}/api/query`, {
+        method: "POST",
 
-    let index = 0;
+        headers: {
+          "Content-Type": "application/json",
+        },
 
-    const interval = setInterval(() => {
-      setAnswer(response.slice(0, index));
-      index++;
+        body: JSON.stringify({
+          question: question,
+        }),
+      });
 
-      if (index > response.length) {
-        clearInterval(interval);
-        setLoading(false);
+      const data: QueryResponse = await response.json();
+
+      if (!response.ok) {
+        setAnswer(
+          data.message || "Query was not understood."
+        );
+      } else if (data.value !== undefined) {
+        setAnswer(
+          `${data.metric || "Result"}: ${data.value}`
+        );
+      } else if (data.message) {
+        setAnswer(data.message);
+      } else if (data.data) {
+        setAnswer(
+          data.chartType
+            ? "Here is the requested business analysis:"
+            : JSON.stringify(data.data, null, 2)
+        );
+
+        if (Array.isArray(data.data)) {
+          setChartData(data.data);
+          setChartType(data.chartType || "");
+        }
+      } else {
+        setAnswer(
+          JSON.stringify(data, null, 2)
+        );
       }
-    }, 30);
+
+      setApiCall(data.apiCall || "");
+      setSql(data.sql || "");
+    } catch {
+      setAnswer(
+        "Unable to connect to MetricMind backend. Make sure the backend is running on port 5000."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const getXAxisKey = () => {
+    if (!chartData.length) return "";
+
+    if ("month" in chartData[0]) {
+      return "month";
+    }
+
+    if ("product" in chartData[0]) {
+      return "product";
+    }
+
+    if ("country" in chartData[0]) {
+      return "country";
+    }
+
+    if ("region" in chartData[0]) {
+      return "region";
+    }
+
+    return Object.keys(chartData[0])[0];
+  };
+
+  const xAxisKey = getXAxisKey();
 
   return (
     <div
@@ -47,7 +142,14 @@ function Chat() {
         type="text"
         placeholder="Ask a business question..."
         value={question}
-        onChange={(e) => setQuestion(e.target.value)}
+        onChange={(e) =>
+          setQuestion(e.target.value)
+        }
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            askQuestion();
+          }
+        }}
         style={{
           width: "100%",
           padding: "12px",
@@ -84,7 +186,212 @@ function Chat() {
           }}
         >
           <strong>AI:</strong>
-          <p>{answer}</p>
+
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              fontFamily: "Arial, sans-serif",
+              marginTop: "10px",
+            }}
+          >
+            {answer}
+          </pre>
+
+          {/* DYNAMIC CHART */}
+
+          {chartData.length > 0 &&
+            chartType === "line" && (
+              <div
+                style={{
+                  background: "white",
+                  padding: "15px",
+                  borderRadius: "10px",
+                  marginTop: "20px",
+                }}
+              >
+                <h3
+                  style={{
+                    color: "#111827",
+                    textAlign: "center",
+                  }}
+                >
+                  Monthly Revenue & Profit
+                </h3>
+
+                <ResponsiveContainer
+                  width="100%"
+                  height={300}
+                >
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+
+                    <XAxis
+                      dataKey={xAxisKey}
+                    />
+
+                    <YAxis />
+
+                    <Tooltip />
+
+                    <Line
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#2563eb"
+                      strokeWidth={3}
+                    />
+
+                    <Line
+                      type="monotone"
+                      dataKey="profit"
+                      stroke="#ef4444"
+                      strokeWidth={3}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            {/* BAR CHART */}
+{chartData.length > 0 &&
+  chartType === "bar" && (
+    <div
+      style={{
+        background: "white",
+        padding: "15px",
+        borderRadius: "10px",
+        marginTop: "20px",
+      }}
+    >
+      <h3
+        style={{
+          color: "#111827",
+          textAlign: "center",
+        }}
+      >
+        Country Performance
+      </h3>
+
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" />
+
+          <XAxis dataKey="country" />
+
+          <YAxis />
+
+          <Tooltip />
+
+          <Bar
+            dataKey="revenue"
+            fill="#2563eb"
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )}
+
+          {chartData.length > 0 &&
+            chartType === "bar" && (
+              <div
+                style={{
+                  background: "white",
+                  padding: "15px",
+                  borderRadius: "10px",
+                  marginTop: "20px",
+                }}
+              >
+                <h3
+                  style={{
+                    color: "#111827",
+                    textAlign: "center",
+                  }}
+                >
+                  Profit by Product
+                </h3>
+
+                <ResponsiveContainer
+                  width="100%"
+                  height={300}
+                >
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+
+                    <XAxis
+                      dataKey={xAxisKey}
+                    />
+
+                    <YAxis />
+
+                    <Tooltip />
+
+                    <Bar
+                      dataKey="profit"
+                      fill="#2563eb"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+          {/* API CALL */}
+
+          {apiCall && (
+            <details
+              style={{
+                marginTop: "20px",
+              }}
+            >
+              <summary
+                style={{
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                }}
+              >
+                🔍 View API Call
+              </summary>
+
+              <div
+                style={{
+                  marginTop: "10px",
+                  background: "#0f172a",
+                  padding: "12px",
+                  borderRadius: "8px",
+                }}
+              >
+                {apiCall}
+              </div>
+            </details>
+          )}
+
+          {/* SQL */}
+
+          {sql && (
+            <details
+              style={{
+                marginTop: "10px",
+              }}
+            >
+              <summary
+                style={{
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                }}
+              >
+                🗄️ View SQL
+              </summary>
+
+              <div
+                style={{
+                  marginTop: "10px",
+                  background: "#0f172a",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  overflowX: "auto",
+                }}
+              >
+                <code>{sql}</code>
+              </div>
+            </details>
+          )}
         </div>
       )}
     </div>
