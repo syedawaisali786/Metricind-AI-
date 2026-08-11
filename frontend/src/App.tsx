@@ -1,280 +1,317 @@
-import { useState } from "react";
-import axios from "axios";
+import { useEffect, useState } from "react";
 
-import Header from "./components/Header";
-import Sidebar from "./components/Sidebar";
 import RevenueChart from "./components/charts/RevenueChart";
 import SalesChart from "./components/charts/SalesChart";
-import RecentTransaction from "./components/RecentTransaction";
-import Analytics from "./Analytics";
+import RegionChart from "./components/RegionChart";
+import RegionalPerformance from "./components/RegionalPerformance";
+import MonthlyPerformance from "./components/MonthlyPerformance";
+import CountryPerformance from "./components/CountryPerformance";
 import Chat from "./Chat";
 
-type Message = {
-  sender: string;
-  text: string;
-};
-
-const cardStyle = {
-  background: "#1e293b",
-  padding: "20px",
-  borderRadius: "10px",
-  textAlign: "center" as const,
-};
+const API_URL = "http://localhost:5000";
 
 function App() {
-  const [page, setPage] = useState("dashboard");
-  const [question, setQuestion] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [revenue, setRevenue] = useState<number | null>(null);
+  const [profit, setProfit] = useState<number | null>(null);
+  const [orders, setOrders] = useState<number | null>(null);
+  const [margin, setMargin] = useState<number | null>(null);
 
-  const askAI = async () => {
-    if (!question.trim()) return;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-    try {
-      const response = await axios.post("http://localhost:5000/ask", {
-        question,
-      });
+  // ============================================================
+  // LOAD KPI SUMMARY
+  // ============================================================
 
-      setMessages((prev) => [
-        ...prev,
-        { sender: "You", text: question },
-        { sender: "AI", text: response.data.answer },
-      ]);
+  useEffect(() => {
+    async function loadMetrics() {
+      try {
+        setLoading(true);
+        setError("");
 
-      setQuestion("");
-    } catch (error) {
-      console.error(error);
+        const response = await fetch(
+          `${API_URL}/api/analytics/summary`
+        );
 
-      setMessages((prev) => [
-        ...prev,
-        { sender: "AI", text: "Unable to get AI response." },
-      ]);
+        if (!response.ok) {
+          throw new Error("Unable to load KPI summary");
+        }
+
+        const data = await response.json();
+
+        setRevenue(data.revenue);
+        setProfit(data.profit);
+        setOrders(data.orders);
+        setMargin(data.margin);
+      } catch (err) {
+        console.error(err);
+        setError(
+          "Could not connect to MetricMind backend."
+        );
+      } finally {
+        setLoading(false);
+      }
     }
+
+    loadMetrics();
+  }, []);
+
+  // ============================================================
+  // FORMAT CURRENCY
+  // ============================================================
+
+  const formatCurrency = (value: number | null) => {
+    if (value === null) {
+      return "...";
+    }
+
+    return `₹${value.toLocaleString("en-IN", {
+      maximumFractionDigits: 0,
+    })}`;
   };
 
-  /* ANALYTICS PAGE */
-  if (page === "chat") {
-  return (
-    <>
-      <Header />
+  // ============================================================
+  // UI
+  // ============================================================
 
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f3f4f6",
+        padding: "30px",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
       <div
         style={{
-          display: "flex",
-          background: "#0f172a",
-          minHeight: "calc(100vh - 70px)",
+          maxWidth: "1200px",
+          margin: "0 auto",
         }}
       >
-        <Sidebar setPage={setPage} />
+
+        {/* ================================================== */}
+        {/* HEADER */}
+        {/* ================================================== */}
 
         <div
           style={{
-            flex: 1,
-            padding: "30px",
-            color: "white",
+            background: "#ffffff",
+            padding: "24px",
+            borderRadius: "12px",
+            marginBottom: "20px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          <Chat />
-        </div>
-      </div>
-    </>
-  );
-}
-  if (page === "analytics") {
-    return (
-      <>
-        <Header />
-
-        <div
-          style={{
-            display: "flex",
-            background: "#0f172a",
-            minHeight: "calc(100vh - 70px)",
-          }}
-        >
-          <Sidebar setPage={setPage} />
-
-          <div
+          <h1
             style={{
-              flex: 1,
-              padding: "20px",
-              color: "white",
-              overflowY: "auto",
+              margin: 0,
+              color: "#111827",
+              fontSize: "30px",
             }}
           >
-            <button
-              onClick={() => setPage("dashboard")}
-              style={{
-                padding: "10px 20px",
-                background: "#2563eb",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                marginBottom: "20px",
-              }}
-            >
-              ← Back to Dashboard
-            </button>
+            MetricMind
+          </h1>
 
-            <Analytics />
-            <Chat />
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  /* DASHBOARD PAGE */
-  return (
-    <>
-      <Header />
-
-      <div
-        style={{
-          display: "flex",
-          background: "#0f172a",
-          minHeight: "calc(100vh - 70px)",
-        }}
-      >
-        <Sidebar setPage={setPage} />
-
-        <div
-          style={{
-            flex: 1,
-            padding: "30px",
-            color: "white",
-            overflowY: "auto",
-          }}
-        >
-          <h1>📊 MetricMind Dashboard</h1>
-
-          <p>
-            Welcome to the AI Powered Business Intelligence Platform.
+          <p
+            style={{
+              margin: "8px 0 0",
+              color: "#6b7280",
+            }}
+          >
+            Agentic Semantic BI Dashboard
           </p>
+        </div>
 
-          {/* DASHBOARD CARDS */}
+        {/* ================================================== */}
+        {/* ERROR MESSAGE */}
+        {/* ================================================== */}
+
+        {error && (
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: "20px",
-              marginTop: "25px",
-            }}
-          >
-            <div style={cardStyle}>
-              <h3>💰 Total Revenue</h3>
-              <h2>₹12.5M</h2>
-              <p style={{ color: "#22c55e" }}>
-                +12.4% this month
-              </p>
-            </div>
-
-            <div style={cardStyle}>
-              <h3>🛒 Total Sales</h3>
-              <h2>4,520</h2>
-              <p style={{ color: "#22c55e" }}>
-                +8.2% this month
-              </p>
-            </div>
-
-            <div style={cardStyle}>
-              <h3>👥 Customers</h3>
-              <h2>1,245</h2>
-              <p style={{ color: "#22c55e" }}>
-                +15% this month
-              </p>
-            </div>
-
-            <div style={cardStyle}>
-              <h3>📈 Profit</h3>
-              <h2>₹3.2M</h2>
-              <p style={{ color: "#22c55e" }}>
-                +5.6% this month
-              </p>
-            </div>
-          </div>
-
-          {/* AI ASSISTANT */}
-          <div
-            style={{
-              marginTop: "30px",
-              background: "#1e293b",
-              padding: "20px",
+              background: "#fee2e2",
+              color: "#991b1b",
+              padding: "15px",
               borderRadius: "10px",
+              marginBottom: "20px",
             }}
           >
-            <h2>🤖 AI Assistant</h2>
+            {error}
+          </div>
+        )}
 
-            <input
-              type="text"
-              placeholder="Ask AI..."
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                borderRadius: "8px",
-                marginTop: "10px",
-                boxSizing: "border-box",
-              }}
-            />
+        {/* ================================================== */}
+        {/* KPI CARDS */}
+        {/* ================================================== */}
 
-            <button
-              onClick={askAI}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(4, minmax(0, 1fr))",
+            gap: "20px",
+            marginBottom: "20px",
+          }}
+        >
+
+          {/* REVENUE */}
+
+          <div
+            style={{
+              background: "#ffffff",
+              padding: "20px",
+              borderRadius: "12px",
+              boxShadow:
+                "0 2px 8px rgba(0,0,0,0.08)",
+            }}
+          >
+            <p
               style={{
-                marginTop: "15px",
-                padding: "10px 20px",
-                background: "#2563eb",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
+                color: "#6b7280",
+                margin: 0,
               }}
             >
-              Ask AI
-            </button>
+              Revenue
+            </p>
 
-            <div style={{ marginTop: "20px" }}>
-              {messages.map((msg, index) => (
-                <div
-                  key={index}
-                  style={{
-                    background:
-                      msg.sender === "You"
-                        ? "#2563eb"
-                        : "#334155",
-                    padding: "10px",
-                    borderRadius: "8px",
-                    marginBottom: "10px",
-                  }}
-                >
-                  <strong>{msg.sender}:</strong> {msg.text}
-                </div>
-              ))}
-            </div>
+            <h2
+              style={{
+                margin: "8px 0 0",
+                color: "#111827",
+              }}
+            >
+              {loading
+                ? "Loading..."
+                : formatCurrency(revenue)}
+            </h2>
           </div>
 
-          {/* CHARTS + RECENT TRANSACTIONS */}
+          {/* PROFIT */}
+
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "2fr 1fr",
-              gap: "20px",
-              marginTop: "30px",
+              background: "#ffffff",
+              padding: "20px",
+              borderRadius: "12px",
+              boxShadow:
+                "0 2px 8px rgba(0,0,0,0.08)",
             }}
           >
-            <div>
-              <RevenueChart />
-              <SalesChart />
-            </div>
+            <p
+              style={{
+                color: "#6b7280",
+                margin: 0,
+              }}
+            >
+              Profit
+            </p>
 
-            <div>
-              <RecentTransaction />
-            </div>
+            <h2
+              style={{
+                margin: "8px 0 0",
+                color: "#111827",
+              }}
+            >
+              {loading
+                ? "Loading..."
+                : formatCurrency(profit)}
+            </h2>
+          </div>
+
+          {/* ORDERS */}
+
+          <div
+            style={{
+              background: "#ffffff",
+              padding: "20px",
+              borderRadius: "12px",
+              boxShadow:
+                "0 2px 8px rgba(0,0,0,0.08)",
+            }}
+          >
+            <p
+              style={{
+                color: "#6b7280",
+                margin: 0,
+              }}
+            >
+              Orders
+            </p>
+
+            <h2
+              style={{
+                margin: "8px 0 0",
+                color: "#111827",
+              }}
+            >
+              {loading
+                ? "Loading..."
+                : orders !== null
+                ? orders.toLocaleString("en-IN")
+                : "..."}
+            </h2>
+          </div>
+
+          {/* MARGIN */}
+
+          <div
+            style={{
+              background: "#ffffff",
+              padding: "20px",
+              borderRadius: "12px",
+              boxShadow:
+                "0 2px 8px rgba(0,0,0,0.08)",
+            }}
+          >
+            <p
+              style={{
+                color: "#6b7280",
+                margin: 0,
+              }}
+            >
+              Margin
+            </p>
+
+            <h2
+              style={{
+                margin: "8px 0 0",
+                color: "#111827",
+              }}
+            >
+              {loading
+                ? "Loading..."
+                : margin !== null
+                ? `${margin.toFixed(1)}%`
+                : "..."}
+            </h2>
           </div>
         </div>
+
+        {/* ================================================== */}
+        {/* ANALYTICS CHARTS */}
+        {/* ================================================== */}
+
+        <RevenueChart />
+
+        <SalesChart />
+
+        <RegionChart />
+
+        <RegionalPerformance />
+
+        <MonthlyPerformance />
+
+        <CountryPerformance />
+
+        {/* ================================================== */}
+        {/* AI CHAT */}
+        {/* ================================================== */}
+
+        <Chat />
+
       </div>
-    </>
+    </div>
   );
 }
 

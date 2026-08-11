@@ -18,7 +18,7 @@ type QueryResponse = {
   metric?: string;
   value?: number;
   message?: string;
-  data?:Record<string, unknown>[];
+  data?: Record<string, unknown>[];
   apiCall?: string;
   sql?: string;
   chartType?: "line" | "bar";
@@ -29,7 +29,9 @@ function Chat() {
   const [answer, setAnswer] = useState("");
   const [apiCall, setApiCall] = useState("");
   const [sql, setSql] = useState("");
-  const [chartData, setChartData] = useState<Record<string, unknown>[]>([]);
+  const [chartData, setChartData] = useState<
+    Record<string, unknown>[]
+  >([]);
   const [chartType, setChartType] = useState<
     "line" | "bar" | ""
   >("");
@@ -48,11 +50,9 @@ function Chat() {
     try {
       const response = await fetch(`${API_URL}/api/query`, {
         method: "POST",
-
         headers: {
           "Content-Type": "application/json",
         },
-
         body: JSON.stringify({
           question: question,
         }),
@@ -60,36 +60,52 @@ function Chat() {
 
       const data: QueryResponse = await response.json();
 
+      // ============================================================
+      // HANDLE BACKEND RESPONSE
+      // ============================================================
+
       if (!response.ok) {
         setAnswer(
           data.message || "Query was not understood."
         );
+      } else if (data.message) {
+        // Detailed AI explanation
+        setAnswer(data.message);
+
+        // Display chart if backend returned chart data
+        if (Array.isArray(data.data)) {
+          setChartData(data.data);
+          setChartType(data.chartType || "");
+        }
       } else if (data.value !== undefined) {
+        // Simple metric response
         setAnswer(
           `${data.metric || "Result"}: ${data.value}`
         );
-      } else if (data.message) {
-        setAnswer(data.message);
-      } else if (data.data) {
+      } else if (Array.isArray(data.data)) {
+        // Analytics response
         setAnswer(
           data.chartType
             ? "Here is the requested business analysis:"
             : JSON.stringify(data.data, null, 2)
         );
 
-        if (Array.isArray(data.data)) {
-          setChartData(data.data);
-          setChartType(data.chartType || "");
-        }
+        setChartData(data.data);
+        setChartType(data.chartType || "");
       } else {
         setAnswer(
           JSON.stringify(data, null, 2)
         );
       }
 
+      // API CALL
       setApiCall(data.apiCall || "");
+
+      // SQL
       setSql(data.sql || "");
-    } catch {
+    } catch (error) {
+      console.error(error);
+
       setAnswer(
         "Unable to connect to MetricMind backend. Make sure the backend is running on port 5000."
       );
@@ -97,6 +113,10 @@ function Chat() {
       setLoading(false);
     }
   };
+
+  // ============================================================
+  // FIND X-AXIS
+  // ============================================================
 
   const getXAxisKey = () => {
     if (!chartData.length) return "";
@@ -122,6 +142,10 @@ function Chat() {
 
   const xAxisKey = getXAxisKey();
 
+  // ============================================================
+  // UI
+  // ============================================================
+
   return (
     <div
       style={{
@@ -137,6 +161,8 @@ function Chat() {
       <p>
         Ask questions about your business data.
       </p>
+
+      {/* QUESTION INPUT */}
 
       <input
         type="text"
@@ -160,6 +186,8 @@ function Chat() {
         }}
       />
 
+      {/* ASK BUTTON */}
+
       <button
         onClick={askQuestion}
         disabled={loading}
@@ -175,6 +203,8 @@ function Chat() {
       >
         {loading ? "Thinking..." : "Ask AI"}
       </button>
+
+      {/* ANSWER */}
 
       {answer && (
         <div
@@ -197,7 +227,9 @@ function Chat() {
             {answer}
           </pre>
 
-          {/* DYNAMIC CHART */}
+          {/* ================================================== */}
+          {/* LINE CHART */}
+          {/* ================================================== */}
 
           {chartData.length > 0 &&
             chartType === "line" && (
@@ -250,44 +282,10 @@ function Chat() {
                 </ResponsiveContainer>
               </div>
             )}
-            {/* BAR CHART */}
-{chartData.length > 0 &&
-  chartType === "bar" && (
-    <div
-      style={{
-        background: "white",
-        padding: "15px",
-        borderRadius: "10px",
-        marginTop: "20px",
-      }}
-    >
-      <h3
-        style={{
-          color: "#111827",
-          textAlign: "center",
-        }}
-      >
-        Country Performance
-      </h3>
 
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" />
-
-          <XAxis dataKey="country" />
-
-          <YAxis />
-
-          <Tooltip />
-
-          <Bar
-            dataKey="revenue"
-            fill="#2563eb"
-          />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  )}
+          {/* ================================================== */}
+          {/* BAR CHART */}
+          {/* ================================================== */}
 
           {chartData.length > 0 &&
             chartType === "bar" && (
@@ -305,7 +303,19 @@ function Chat() {
                     textAlign: "center",
                   }}
                 >
-                  Profit by Product
+                  {question
+                    .toLowerCase()
+                    .includes("region")
+                    ? "Regional Performance"
+                    : question
+                        .toLowerCase()
+                        .includes("country")
+                    ? "Country Performance"
+                    : question
+                        .toLowerCase()
+                        .includes("product")
+                    ? "Product Performance"
+                    : "Business Performance"}
                 </h3>
 
                 <ResponsiveContainer
@@ -332,7 +342,9 @@ function Chat() {
               </div>
             )}
 
+          {/* ================================================== */}
           {/* API CALL */}
+          {/* ================================================== */}
 
           {apiCall && (
             <details
@@ -362,7 +374,9 @@ function Chat() {
             </details>
           )}
 
+          {/* ================================================== */}
           {/* SQL */}
+          {/* ================================================== */}
 
           {sql && (
             <details
