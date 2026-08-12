@@ -8,6 +8,8 @@ import MonthlyPerformance from "./components/MonthlyPerformance";
 import CountryPerformance from "./components/CountryPerformance";
 import KPICards from "./components/KPICards";
 import FilterBar from "./components/FilterBar";
+import ExecutiveInsights from "./components/ExecutiveInsights";
+import Recommendations from "./components/Recommendations";
 import Chat from "./Chat";
 
 function App() {
@@ -208,6 +210,23 @@ function App() {
           product={product}
           month={month}
         />
+
+{/* ================================================== */}
+{/* EXECUTIVE INSIGHTS */}
+{/* ================================================== */}
+
+<ExecutiveInsights
+  country={appliedFilters.country}
+  region={appliedFilters.region}
+  product={appliedFilters.product}
+  month={appliedFilters.month}
+/>
+<Recommendations
+  country={appliedFilters.country}
+  region={appliedFilters.region}
+  product={appliedFilters.product}
+  month={appliedFilters.month}
+/>
 
         {/* ================================================== */}
         {/* ANALYTICS */}

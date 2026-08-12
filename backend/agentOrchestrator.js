@@ -12,8 +12,7 @@ import {
   regionAnalytics,
   countryAnalytics,
   monthlyAnalytics,
-  productAnalytics,
-  productAnalyticsByRegion
+  productAnalytics
 } from "./semanticLayer.js";
 
 
@@ -37,7 +36,11 @@ export function extractFilters(question) {
     filters.country = "India";
   }
 
-  else if (q.includes("usa") || q.includes("us")) {
+  else if (
+    q.includes("usa") ||
+    q.includes("u.s.a") ||
+    q.includes("us ")
+  ) {
     filters.country = "USA";
   }
 
@@ -140,9 +143,7 @@ export function extractFilters(question) {
     filters.month = "4";
   }
 
-  else if (
-    q.includes("may")
-  ) {
+  else if (q.includes("may")) {
     filters.month = "5";
   }
 
@@ -500,7 +501,7 @@ export function executeAgent(question) {
 
 
     // --------------------------------------------------------
-    // APPLY FILTERS
+    // APPLY SEMANTIC FILTERS
     // --------------------------------------------------------
 
     const rows =
@@ -508,7 +509,7 @@ export function executeAgent(question) {
 
 
     // --------------------------------------------------------
-    // CALCULATE METRIC
+    // CALCULATE GOVERNED METRIC
     // --------------------------------------------------------
 
     const value =
@@ -518,12 +519,14 @@ export function executeAgent(question) {
       );
 
 
-    const hasData =
-      rows.length > 0;
+    const roundedValue =
+      Number(
+        value.toFixed(2)
+      );
 
 
     // --------------------------------------------------------
-    // FILTER DESCRIPTION
+    // BUILD FILTER DESCRIPTION
     // --------------------------------------------------------
 
     const filterParts = [];
@@ -531,22 +534,21 @@ export function executeAgent(question) {
 
     if (filters.country) {
       filterParts.push(
-        `country: ${filters.country}`
+        `Country = ${filters.country}`
       );
     }
 
     if (filters.region) {
       filterParts.push(
-        `region: ${filters.region}`
+        `Region = ${filters.region}`
       );
     }
 
     if (filters.product) {
       filterParts.push(
-        `product: ${filters.product}`
+        `Product = ${filters.product}`
       );
     }
-
 
     if (filters.month) {
 
@@ -561,7 +563,7 @@ export function executeAgent(question) {
       ];
 
       filterParts.push(
-        `month: ${
+        `Month = ${
           monthNames[
             Number(filters.month)
           ] || filters.month
@@ -571,29 +573,42 @@ export function executeAgent(question) {
 
 
     // --------------------------------------------------------
-    // BUILD ANSWER
+    // FORMAT VALUE
     // --------------------------------------------------------
 
-    let message;
+    const formattedValue =
+      metric === "margin"
+        ? `${roundedValue}%`
+        : `₹${roundedValue.toLocaleString("en-IN")}`;
 
 
-    if (!hasData) {
+    // --------------------------------------------------------
+    // BUILD BUSINESS INSIGHT
+    // --------------------------------------------------------
 
-      message =
-        `No business data was found for the selected filters (${filterParts.join(", ")}). ` +
-        `The governed metric "${definition.name}" therefore returns ₹0.`;
+    let insight;
+
+
+    if (rows.length === 0) {
+
+      insight =
+        `No business records match the selected filters. ` +
+        `${definition.name} is therefore ${formattedValue}.`;
 
     } else {
 
-      const formattedValue =
-        metric === "margin"
-          ? `${Number(value.toFixed(2))}%`
-          : `₹${Number(value.toFixed(2)).toLocaleString("en-IN")}`;
-
-      message =
-        `${definition.name} for the selected filters is ${formattedValue}.`;
+      insight =
+        `${definition.name} is ${formattedValue} ` +
+        `for the selected business filters. ` +
+        `${rows.length} matching record${
+          rows.length === 1 ? "" : "s"
+        } were found.`;
     }
 
+
+    // --------------------------------------------------------
+    // RETURN AGENT RESULT
+    // --------------------------------------------------------
 
     return {
 
@@ -603,19 +618,27 @@ export function executeAgent(question) {
         "Agentic Filtered Semantic Metric Query",
 
       agentSteps: [
+
         "Interpret user question",
+
         "Extract business filters",
+
         "Validate query through governance",
+
         "Retrieve governed metric definition",
+
         "Apply filters through semantic layer",
+
         "Calculate deterministic metric",
-        "Generate business explanation"
+
+        "Generate business insight"
+
       ],
 
       metric,
 
       value:
-        Number(value.toFixed(2)),
+        roundedValue,
 
       filters,
 
@@ -623,6 +646,7 @@ export function executeAgent(question) {
         rows.length,
 
       semanticMetric: {
+
         name:
           definition.name,
 
@@ -631,16 +655,23 @@ export function executeAgent(question) {
 
         aggregation:
           definition.aggregation
+
       },
 
-      message,
+      message:
+        insight,
 
       governance: {
+
         allowed: true,
+
         deterministic: true,
+
         sqlGeneratedByLLM: false,
+
         reason:
           "Query approved by MetricMind Governance."
+
       },
 
       apiCall:
@@ -651,6 +682,7 @@ export function executeAgent(question) {
           metric,
           filters
         )
+
     };
   }
 
@@ -672,30 +704,43 @@ export function executeAgent(question) {
         "Governed Q3 Revenue Query",
 
       agentSteps: [
+
         "Interpret user question",
+
         "Identify Revenue metric",
+
         "Apply Q3 quarter filter",
+
         "Query governed semantic layer",
+
         "Return deterministic result"
+
       ],
 
-      metric: "revenue",
+      metric:
+        "revenue",
 
       filters: {
         quarter: "Q3"
       },
 
-      value: 0,
+      value:
+        0,
 
       message:
         "Q3 revenue is ₹0 because the current mock dataset contains only Jan-Jun data. No Q3 records are available.",
 
       governance: {
+
         allowed: true,
+
         deterministic: true,
+
         sqlGeneratedByLLM: false,
+
         reason:
           "Query approved by MetricMind Governance."
+
       },
 
       apiCall:
@@ -705,6 +750,7 @@ export function executeAgent(question) {
         "SELECT SUM(revenue) " +
         "FROM business_data " +
         "WHERE quarter = 'Q3';"
+
     };
   }
 
@@ -722,8 +768,12 @@ export function executeAgent(question) {
       interpretation.filters || {};
 
 
+    const hasFilters =
+      Object.keys(filters).length > 0;
+
+
     const filteredRows =
-      Object.keys(filters).length > 0
+      hasFilters
         ? filterData(filters)
         : null;
 
@@ -755,10 +805,6 @@ export function executeAgent(question) {
         : calculateMetric("profit");
 
 
-    // --------------------------------------------------------
-    // REGIONAL ANALYSIS
-    // --------------------------------------------------------
-
     const regions =
       filteredRows
         ? regionAnalytics(filters)
@@ -779,10 +825,6 @@ export function executeAgent(question) {
       )[0];
 
 
-    // --------------------------------------------------------
-    // PRODUCT DRILL-DOWN
-    // --------------------------------------------------------
-
     let regionalProducts = [];
 
     let weakestProduct = null;
@@ -790,9 +832,16 @@ export function executeAgent(question) {
 
     if (lowestProfitRegion) {
 
-      regionalProducts =
-        productAnalyticsByRegion(
+      const drillFilters = {
+        ...filters,
+        region:
           lowestProfitRegion.region
+      };
+
+
+      regionalProducts =
+        productAnalytics(
+          drillFilters
         );
 
 
@@ -803,10 +852,6 @@ export function executeAgent(question) {
         )[0];
     }
 
-
-    // --------------------------------------------------------
-    // EXPLANATION
-    // --------------------------------------------------------
 
     let explanation =
       `Total revenue is ₹${totalRevenue.toLocaleString("en-IN")}, ` +
@@ -847,23 +892,38 @@ export function executeAgent(question) {
         "Agentic Multi-Step Profit Root-Cause Analysis",
 
       agentSteps: [
+
         "Interpret user question",
+
         "Retrieve governed profit metric",
+
         "Calculate total revenue",
+
         "Calculate total cost",
+
         "Calculate total profit",
+
         "Query regional performance",
+
         "Identify highest-cost region",
+
         "Identify lowest-profit region",
+
         "Drill down into product performance",
+
         "Identify weakest product",
+
         "Generate root-cause explanation"
+
       ],
 
-      metric: "profit",
+      metric:
+        "profit",
 
       value:
-        totalProfit,
+        Number(
+          totalProfit.toFixed(2)
+        ),
 
       message:
         explanation,
@@ -897,6 +957,7 @@ export function executeAgent(question) {
           weakestProduct
             ? weakestProduct.profit
             : null
+
       },
 
       governance: {
@@ -909,10 +970,11 @@ export function executeAgent(question) {
 
         reason:
           "Query approved by MetricMind Governance."
+
       },
 
       apiCall:
-        "GET /api/analytics/product",
+        "/api/analytics/product",
 
       sql:
         "SELECT region, " +
@@ -921,6 +983,7 @@ export function executeAgent(question) {
         "SUM(revenue - cost) AS profit " +
         "FROM business_data " +
         "GROUP BY region;"
+
     };
   }
 
@@ -937,6 +1000,7 @@ export function executeAgent(question) {
     const filters =
       interpretation.filters || {};
 
+
     return {
 
       question,
@@ -950,11 +1014,17 @@ export function executeAgent(question) {
       filters,
 
       agentSteps: [
+
         "Interpret user question",
+
         "Identify Time dimension",
+
         "Apply semantic filters",
+
         "Query monthly analytics",
+
         "Return time-series result"
+
       ],
 
       data:
@@ -964,13 +1034,20 @@ export function executeAgent(question) {
         "line",
 
       governance: {
+
         allowed: true,
+
         deterministic: true,
-        sqlGeneratedByLLM: false
+
+        sqlGeneratedByLLM: false,
+
+        reason:
+          "Query approved by MetricMind Governance."
+
       },
 
       apiCall:
-        "GET /api/analytics/monthly",
+        "/api/analytics/monthly",
 
       sql:
         "SELECT month, " +
@@ -978,6 +1055,7 @@ export function executeAgent(question) {
         "SUM(revenue) - SUM(cost) AS profit " +
         "FROM business_data " +
         "GROUP BY month;"
+
     };
   }
 
@@ -994,6 +1072,7 @@ export function executeAgent(question) {
     const filters =
       interpretation.filters || {};
 
+
     return {
 
       question,
@@ -1007,11 +1086,17 @@ export function executeAgent(question) {
       filters,
 
       agentSteps: [
+
         "Interpret user question",
+
         "Identify Geography dimension",
+
         "Apply semantic filters",
+
         "Group revenue by country",
-        "Return result"
+
+        "Return governed result"
+
       ],
 
       data:
@@ -1021,13 +1106,278 @@ export function executeAgent(question) {
         "bar",
 
       governance: {
+
         allowed: true,
 
         deterministic: true,
 
-        sqlGeneratedByLLM: false
+        sqlGeneratedByLLM: false,
+
+        reason:
+          "Query approved by MetricMind Governance."
 
       },
+
+      apiCall:
+        "/api/analytics/country",
+
+      sql:
+        "SELECT country, " +
+        "SUM(revenue) AS revenue " +
+        "FROM business_data " +
+        "GROUP BY country;"
+
+    };
+  }
+
+
+  // ==========================================================
+  // REGION ANALYSIS
+  // ==========================================================
+
+  if (
+    interpretation.intent ===
+    "region_analysis"
+  ) {
+
+    const filters =
+      interpretation.filters || {};
+
+
+    return {
+
+      question,
+
+      interpretation:
+        "Agentic Regional Analysis",
+
+      metric:
+        "revenue",
+
+      filters,
+
+      agentSteps: [
+
+        "Interpret user question",
+
+        "Identify Region dimension",
+
+        "Apply semantic filters",
+
+        "Group revenue by region",
+
+        "Return governed result"
+
+      ],
+
+      data:
+        regionAnalytics(filters),
+
+      chartType:
+        "bar",
+
+      governance: {
+
+        allowed: true,
+
+        deterministic: true,
+
+        sqlGeneratedByLLM: false,
+
+        reason:
+          "Query approved by MetricMind Governance."
+
+      },
+
+      apiCall:
+        "/api/analytics/region",
+
+      sql:
+        "SELECT region, " +
+        "SUM(revenue) AS revenue " +
+        "FROM business_data " +
+        "GROUP BY region;"
+
+    };
+  }
+
+
+  // ==========================================================
+  // PRODUCT ANALYSIS
+  // ==========================================================
+
+  if (
+    interpretation.intent ===
+    "product_analysis"
+  ) {
+
+    const filters =
+      interpretation.filters || {};
+
+
+    return {
+
+      question,
+
+      interpretation:
+        "Agentic Product Analysis",
+
+      metric:
+        "profit",
+
+      filters,
+
+      agentSteps: [
+
+        "Interpret user question",
+
+        "Identify Product dimension",
+
+        "Apply semantic filters",
+
+        "Calculate profit by product",
+
+        "Return governed result"
+
+      ],
+
+      data:
+        productAnalytics(filters),
+
+      chartType:
+        "bar",
+
+      governance: {
+
+        allowed: true,
+
+        deterministic: true,
+
+        sqlGeneratedByLLM: false,
+
+        reason:
+          "Query approved by MetricMind Governance."
+
+      },
+
+      apiCall:
+        "/api/analytics/product",
+
+      sql:
+        "SELECT product, " +
+        "SUM(revenue) - SUM(cost) AS profit " +
+        "FROM business_data " +
+        "GROUP BY product;"
+
+    };
+  }
+
+
+  // ==========================================================
+  // SINGLE METRIC
+  // ==========================================================
+
+  if (
+    interpretation.intent ===
+    "metric"
+  ) {
+
+    const metric =
+      interpretation.metric;
+
+
+    const definition =
+      getMetric(metric);
+
+
+    if (!definition) {
+      return null;
+    }
+
+
+    const filters =
+      interpretation.filters || {};
+
+
+    const rows =
+      Object.keys(filters).length > 0
+        ? filterData(filters)
+        : filterData();
+
+
+    const value =
+      calculateMetric(
+        metric,
+        rows
+      );
+
+
+    return {
+
+      question,
+
+      interpretation:
+        "Governed Semantic Metric Query",
+
+      agentSteps: [
+
+        "Interpret user question",
+
+        "Identify governed metric",
+
+        "Retrieve semantic definition",
+
+        "Apply semantic filters",
+
+        "Calculate metric",
+
+        "Return deterministic result"
+
+      ],
+
+      metric,
+
+      value:
+        Number(
+          value.toFixed(2)
+        ),
+
+      filters,
+
+      rowCount:
+        rows.length,
+
+      semanticMetric: {
+
+        name:
+          definition.name,
+
+        description:
+          definition.description,
+
+        aggregation:
+          definition.aggregation
+
+      },
+
+      governance: {
+
+        allowed: true,
+
+        deterministic: true,
+
+        sqlGeneratedByLLM: false,
+
+        reason:
+          "Query approved by MetricMind Governance."
+
+      },
+
+      message:
+        `${definition.name} is ${formatMetricValue(
+          metric,
+          value
+        )}.`,
 
       apiCall:
         `/api/metrics/${metric}${buildQueryString(filters)}`,
@@ -1037,6 +1387,7 @@ export function executeAgent(question) {
           metric,
           filters
         )
+
     };
   }
 
@@ -1052,9 +1403,11 @@ export function executeAgent(question) {
     interpretation:
       "Unknown Query",
 
-    metric: null,
+    metric:
+      null,
 
-    value: null,
+    value:
+      null,
 
     filters:
       interpretation.filters || {},
@@ -1074,19 +1427,45 @@ export function executeAgent(question) {
 
   };
 }
+
+
 // ============================================================
-// 4. BUILD QUERY STRING
+// 4. FORMAT METRIC VALUE
 // ============================================================
 
-function buildQueryString(filters = {}) {
+function formatMetricValue(
+  metric,
+  value
+) {
+
+  const rounded =
+    Number(
+      value.toFixed(2)
+    );
+
+
+  if (metric === "margin") {
+
+    return `${rounded}%`;
+
+  }
+
+
+  return `₹${rounded.toLocaleString("en-IN")}`;
+}
+
+
+// ============================================================
+// 5. BUILD QUERY STRING
+// ============================================================
+
+function buildQueryString(
+  filters = {}
+) {
 
   const params =
     new URLSearchParams();
 
-
-  // ==========================================================
-  // COUNTRY
-  // ==========================================================
 
   if (filters.country) {
 
@@ -1094,12 +1473,9 @@ function buildQueryString(filters = {}) {
       "country",
       filters.country
     );
+
   }
 
-
-  // ==========================================================
-  // REGION
-  // ==========================================================
 
   if (filters.region) {
 
@@ -1107,12 +1483,9 @@ function buildQueryString(filters = {}) {
       "region",
       filters.region
     );
+
   }
 
-
-  // ==========================================================
-  // PRODUCT
-  // ==========================================================
 
   if (filters.product) {
 
@@ -1120,12 +1493,9 @@ function buildQueryString(filters = {}) {
       "product",
       filters.product
     );
+
   }
 
-
-  // ==========================================================
-  // MONTH
-  // ==========================================================
 
   if (filters.month) {
 
@@ -1133,6 +1503,7 @@ function buildQueryString(filters = {}) {
       "month",
       filters.month
     );
+
   }
 
 
@@ -1147,7 +1518,7 @@ function buildQueryString(filters = {}) {
 
 
 // ============================================================
-// 5. BUILD DETERMINISTIC SQL REPRESENTATION
+// 6. BUILD DETERMINISTIC SQL REPRESENTATION
 // ============================================================
 
 function buildMetricSQL(
@@ -1157,10 +1528,6 @@ function buildMetricSQL(
 
   let formula;
 
-
-  // ==========================================================
-  // GOVERNED METRIC FORMULAS
-  // ==========================================================
 
   switch (metric) {
 
@@ -1208,86 +1575,60 @@ function buildMetricSQL(
 
       formula =
         "UNKNOWN_METRIC";
+
   }
 
-
-  // ==========================================================
-  // BASE SQL
-  // ==========================================================
 
   let sql =
     `SELECT ${formula} FROM business_data`;
 
 
-  // ==========================================================
-  // FILTER CONDITIONS
-  // ==========================================================
-
   const conditions = [];
 
-
-  // ----------------------------------------------------------
-  // COUNTRY FILTER
-  // ----------------------------------------------------------
 
   if (filters.country) {
 
     conditions.push(
       `country = '${filters.country}'`
     );
+
   }
 
-
-  // ----------------------------------------------------------
-  // REGION FILTER
-  // ----------------------------------------------------------
 
   if (filters.region) {
 
     conditions.push(
       `region = '${filters.region}'`
     );
+
   }
 
-
-  // ----------------------------------------------------------
-  // PRODUCT FILTER
-  // ----------------------------------------------------------
 
   if (filters.product) {
 
     conditions.push(
       `product = '${filters.product}'`
     );
+
   }
 
-
-  // ----------------------------------------------------------
-  // MONTH FILTER
-  // ----------------------------------------------------------
 
   if (filters.month) {
 
     conditions.push(
       `MONTH(date) = ${Number(filters.month)}`
     );
+
   }
 
-
-  // ==========================================================
-  // ADD WHERE CLAUSE
-  // ==========================================================
 
   if (conditions.length > 0) {
 
     sql +=
       ` WHERE ${conditions.join(" AND ")}`;
+
   }
 
-
-  // ==========================================================
-  // END SQL
-  // ==========================================================
 
   sql += ";";
 
