@@ -6,81 +6,104 @@ type KPIData = {
   revenue: number;
   cost: number;
   profit: number;
+  orders: number;
   margin: number;
 };
 
-function KPICards() {
+type KPICardsProps = {
+  country: string;
+  region: string;
+  product: string;
+  month: string;
+};
+
+function KPICards({
+  country,
+  region,
+  product,
+  month,
+}: KPICardsProps) {
   const [kpi, setKpi] = useState<KPIData>({
     revenue: 0,
     cost: 0,
     profit: 0,
+    orders: 0,
     margin: 0,
   });
 
-  const [loading, setLoading] = useState(true);
-
-  // ============================================================
-  // LOAD KPI DATA
-  // ============================================================
-
-  async function loadKPIs() {
-    try {
-      setLoading(true);
-
-      const [
-        revenueRes,
-        costRes,
-        profitRes,
-        marginRes,
-      ] = await Promise.all([
-        fetch(`${API_URL}/api/metrics/revenue`),
-        fetch(`${API_URL}/api/metrics/cost`),
-        fetch(`${API_URL}/api/metrics/profit`),
-        fetch(`${API_URL}/api/metrics/margin`),
-      ]);
-
-      if (
-        !revenueRes.ok ||
-        !costRes.ok ||
-        !profitRes.ok ||
-        !marginRes.ok
-      ) {
-        throw new Error("Failed to fetch KPI data");
-      }
-
-      const revenue = await revenueRes.json();
-      const cost = await costRes.json();
-      const profit = await profitRes.json();
-      const margin = await marginRes.json();
-
-      setKpi({
-        revenue: Number(revenue.value || 0),
-        cost: Number(cost.value || 0),
-        profit: Number(profit.value || 0),
-        margin: Number(margin.value || 0),
-      });
-    } catch (error) {
-      console.error(
-        "Failed to load KPI data:",
-        error
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // ============================================================
-  // LOAD KPIs WHEN COMPONENT STARTS
-  // ============================================================
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadKPIs();
-  }, []);
+    let cancelled = false;
 
-  // ============================================================
-  // FORMAT CURRENCY
-  // ============================================================
+    async function fetchKPIs() {
+      try {
+        setLoading(true);
+
+        const params = new URLSearchParams();
+
+        if (country.trim()) {
+          params.append("country", country.trim());
+        }
+
+        if (region.trim()) {
+          params.append("region", region.trim());
+        }
+
+        if (product.trim()) {
+          params.append("product", product.trim());
+        }
+
+        if (month.trim()) {
+          params.append("month", month.trim());
+        }
+
+        const query = params.toString();
+
+        const url = query
+          ? `${API_URL}/api/analytics/filtered?${query}`
+          : `${API_URL}/api/analytics/summary`;
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error("Unable to load KPI data");
+        }
+
+        const result = await response.json();
+
+        if (cancelled) return;
+
+        const data = result.data ?? result;
+
+        setKpi({
+          revenue: Number(data.revenue || 0),
+          cost: Number(data.cost || 0),
+          profit: Number(data.profit || 0),
+          orders: Number(data.orders || 0),
+          margin: Number(data.margin || 0),
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.error(
+            "Failed to load KPI data:",
+            error
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+     
+    fetchKPIs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [country, region, product, month]);
 
   const formatCurrency = (value: number) => {
     return `₹${value.toLocaleString("en-IN", {
@@ -88,27 +111,23 @@ function KPICards() {
     })}`;
   };
 
-  // ============================================================
-  // LOADING
-  // ============================================================
-
   if (loading) {
     return (
       <div
         style={{
-          padding: "20px",
+          background: "#ffffff",
+          padding: "25px",
+          borderRadius: "12px",
+          marginBottom: "25px",
           textAlign: "center",
-          color: "#64748b",
+          boxShadow:
+            "0 4px 12px rgba(0,0,0,0.08)",
         }}
       >
         Loading business KPIs...
       </div>
     );
   }
-
-  // ============================================================
-  // KPI CARDS
-  // ============================================================
 
   return (
     <div
@@ -121,9 +140,7 @@ function KPICards() {
       }}
     >
 
-      {/* ================================================== */}
       {/* REVENUE */}
-      {/* ================================================== */}
 
       <div
         style={{
@@ -155,9 +172,7 @@ function KPICards() {
         </h2>
       </div>
 
-      {/* ================================================== */}
       {/* COST */}
-      {/* ================================================== */}
 
       <div
         style={{
@@ -189,9 +204,7 @@ function KPICards() {
         </h2>
       </div>
 
-      {/* ================================================== */}
       {/* PROFIT */}
-      {/* ================================================== */}
 
       <div
         style={{
@@ -223,9 +236,39 @@ function KPICards() {
         </h2>
       </div>
 
-      {/* ================================================== */}
+      {/* ORDERS */}
+
+      <div
+        style={{
+          background: "#ffffff",
+          padding: "20px",
+          borderRadius: "12px",
+          boxShadow:
+            "0 4px 12px rgba(0,0,0,0.08)",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            color: "#64748b",
+            fontSize: "14px",
+          }}
+        >
+          TOTAL ORDERS
+        </p>
+
+        <h2
+          style={{
+            marginTop: "10px",
+            marginBottom: 0,
+            color: "#f59e0b",
+          }}
+        >
+          {kpi.orders.toLocaleString("en-IN")}
+        </h2>
+      </div>
+
       {/* MARGIN */}
-      {/* ================================================== */}
 
       <div
         style={{

@@ -14,108 +14,126 @@ import {
 
 const API_URL = "http://localhost:5000";
 
-type QueryResponse = {
-  metric?: string;
-  value?: number;
-  message?: string;
-  data?: Record<string, unknown>[];
-  apiCall?: string;
-  sql?: string;
-  chartType?: "line" | "bar";
+// ============================================================
+// TYPES
+// ============================================================
+
+type Governance = {
+  allowed?: boolean;
+  reason?: string;
+  deterministic?: boolean;
+  sqlGeneratedByLLM?: boolean;
 };
+
+type DrillDown = {
+  highestCostRegion?: string | null;
+  highestCostValue?: number | null;
+
+  lowestProfitRegion?: string | null;
+  lowestProfitValue?: number | null;
+
+  lowestProfitProduct?: string | null;
+  lowestProductProfit?: number | null;
+};
+
+type QueryResponse = {
+  question?: string;
+
+  interpretation?: string;
+
+  agentSteps?: string[];
+
+  metric?: string;
+
+  value?: number;
+
+  message?: string;
+
+  data?: Record<string, unknown>[];
+
+  chartType?: "line" | "bar";
+
+  apiCall?: string;
+
+  sql?: string;
+
+  filters?: Record<string, unknown>;
+
+  semanticMetric?: {
+    name?: string;
+    formula?: string;
+  };
+
+  governance?: Governance;
+
+  drillDown?: DrillDown;
+};
+
+// ============================================================
+// CHAT COMPONENT
+// ============================================================
 
 function Chat() {
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [apiCall, setApiCall] = useState("");
-  const [sql, setSql] = useState("");
-  const [chartData, setChartData] = useState<
-    Record<string, unknown>[]
-  >([]);
-  const [chartType, setChartType] = useState<
-    "line" | "bar" | ""
-  >("");
+
+  const [responseData, setResponseData] =
+    useState<QueryResponse | null>(null);
+
   const [loading, setLoading] = useState(false);
+
+  // ==========================================================
+  // ASK QUESTION
+  // ==========================================================
 
   const askQuestion = async () => {
     if (!question.trim()) return;
 
     setLoading(true);
-    setAnswer("");
-    setApiCall("");
-    setSql("");
-    setChartData([]);
-    setChartType("");
+    setResponseData(null);
 
     try {
-      const response = await fetch(`${API_URL}/api/query`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          question: question,
-        }),
-      });
+      const response = await fetch(
+        `${API_URL}/api/query`,
+        {
+          method: "POST",
 
-      const data: QueryResponse = await response.json();
+          headers: {
+            "Content-Type": "application/json",
+          },
 
-      // ============================================================
-      // HANDLE BACKEND RESPONSE
-      // ============================================================
-
-      if (!response.ok) {
-        setAnswer(
-          data.message || "Query was not understood."
-        );
-      } else if (data.message) {
-        // Detailed AI explanation
-        setAnswer(data.message);
-
-        // Display chart if backend returned chart data
-        if (Array.isArray(data.data)) {
-          setChartData(data.data);
-          setChartType(data.chartType || "");
+          body: JSON.stringify({
+            question: question.trim(),
+          }),
         }
-      } else if (data.value !== undefined) {
-        // Simple metric response
-        setAnswer(
-          `${data.metric || "Result"}: ${data.value}`
-        );
-      } else if (Array.isArray(data.data)) {
-        // Analytics response
-        setAnswer(
-          data.chartType
-            ? "Here is the requested business analysis:"
-            : JSON.stringify(data.data, null, 2)
-        );
+      );
 
-        setChartData(data.data);
-        setChartType(data.chartType || "");
-      } else {
-        setAnswer(
-          JSON.stringify(data, null, 2)
-        );
-      }
+      const data: QueryResponse =
+        await response.json();
 
-      // API CALL
-      setApiCall(data.apiCall || "");
+      setResponseData(data);
 
-      // SQL
-      setSql(data.sql || "");
     } catch (error) {
       console.error(error);
 
-      setAnswer(
-        "Unable to connect to MetricMind backend. Make sure the backend is running on port 5000."
-      );
+      setResponseData({
+        message:
+          "Unable to connect to MetricMind backend. Make sure the backend is running on port 5000.",
+      });
+
     } finally {
       setLoading(false);
     }
   };
 
   // ============================================================
-  // FIND X-AXIS
+  // CHART DATA
+  // ============================================================
+
+  const chartData =
+    responseData?.data || [];
+
+  // ============================================================
+  // FIND X AXIS
   // ============================================================
 
   const getXAxisKey = () => {
@@ -143,26 +161,79 @@ function Chat() {
   const xAxisKey = getXAxisKey();
 
   // ============================================================
+  // CHECK CHART FIELDS
+  // ============================================================
+
+  const hasRevenue =
+    chartData.length > 0 &&
+    "revenue" in chartData[0];
+
+  const hasCost =
+    chartData.length > 0 &&
+    "cost" in chartData[0];
+
+  const hasProfit =
+    chartData.length > 0 &&
+    "profit" in chartData[0];
+
+  // ============================================================
+  // FORMAT CURRENCY
+  // ============================================================
+
+  const formatCurrency = (
+    value: number | null | undefined
+  ) => {
+    if (
+      value === null ||
+      value === undefined
+    ) {
+      return "N/A";
+    }
+
+    return `₹${value.toLocaleString("en-IN")}`;
+  };
+
+  // ============================================================
   // UI
   // ============================================================
 
   return (
     <div
       style={{
-        background: "#1e293b",
+        background:
+          "linear-gradient(135deg, #0f172a, #1e293b)",
         padding: "25px",
-        borderRadius: "12px",
+        borderRadius: "16px",
         marginTop: "25px",
         color: "white",
+        boxShadow:
+          "0 10px 30px rgba(0,0,0,0.25)",
       }}
     >
-      <h2>🤖 MetricMind AI Chat</h2>
 
-      <p>
+      {/* ====================================================== */}
+      {/* HEADER */}
+      {/* ====================================================== */}
+
+      <h2
+        style={{
+          marginBottom: "5px",
+        }}
+      >
+        🤖 MetricMind AI
+      </h2>
+
+      <p
+        style={{
+          color: "#cbd5e1",
+        }}
+      >
         Ask questions about your business data.
       </p>
 
+      {/* ====================================================== */}
       {/* QUESTION INPUT */}
+      {/* ====================================================== */}
 
       <input
         type="text"
@@ -178,61 +249,642 @@ function Chat() {
         }}
         style={{
           width: "100%",
-          padding: "12px",
-          borderRadius: "8px",
-          border: "none",
-          marginTop: "10px",
+          padding: "14px",
+          borderRadius: "10px",
+          border: "1px solid #475569",
+          background: "#f8fafc",
+          color: "#111827",
+          marginTop: "15px",
           boxSizing: "border-box",
+          fontSize: "15px",
         }}
       />
 
+      {/* ====================================================== */}
       {/* ASK BUTTON */}
+      {/* ====================================================== */}
 
       <button
         onClick={askQuestion}
         disabled={loading}
         style={{
           marginTop: "15px",
-          padding: "10px 20px",
-          background: "#2563eb",
+          padding: "11px 24px",
+          background: loading
+            ? "#64748b"
+            : "#2563eb",
           color: "white",
           border: "none",
-          borderRadius: "8px",
-          cursor: "pointer",
+          borderRadius: "9px",
+          cursor: loading
+            ? "not-allowed"
+            : "pointer",
+          fontWeight: "bold",
         }}
       >
-        {loading ? "Thinking..." : "Ask AI"}
+        {loading
+          ? "Thinking..."
+          : "Ask AI"}
       </button>
 
-      {/* ANSWER */}
+      {/* ====================================================== */}
+      {/* RESPONSE */}
+      {/* ====================================================== */}
 
-      {answer && (
+      {responseData && (
         <div
           style={{
-            marginTop: "20px",
+            marginTop: "25px",
             background: "#334155",
-            padding: "15px",
-            borderRadius: "8px",
+            padding: "20px",
+            borderRadius: "12px",
           }}
         >
-          <strong>AI:</strong>
 
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              fontFamily: "Arial, sans-serif",
-              marginTop: "10px",
-            }}
-          >
-            {answer}
-          </pre>
+          {/* ================================================== */}
+          {/* INTERPRETATION */}
+          {/* ================================================== */}
+
+          {responseData.interpretation && (
+            <div
+              style={{
+                marginBottom: "20px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "#94a3b8",
+                  marginBottom: "5px",
+                }}
+              >
+                INTERPRETATION
+              </div>
+
+              <div
+                style={{
+                  fontSize: "18px",
+                  fontWeight: "bold",
+                }}
+              >
+                🧠 {responseData.interpretation}
+              </div>
+            </div>
+          )}
+
+          {/* ================================================== */}
+          {/* AI ANSWER */}
+          {/* ================================================== */}
+
+          {responseData.message && (
+            <div
+              style={{
+                background: "#1e293b",
+                padding: "16px",
+                borderRadius: "10px",
+                marginBottom: "20px",
+              }}
+            >
+              <strong
+                style={{
+                  fontSize: "16px",
+                }}
+              >
+                🤖 AI Answer
+              </strong>
+
+              <p
+                style={{
+                  lineHeight: "1.6",
+                  color: "#e2e8f0",
+                }}
+              >
+                {responseData.message}
+              </p>
+            </div>
+          )}
+
+          {/* ================================================== */}
+          {/* ROOT CAUSE DRILL-DOWN */}
+          {/* ================================================== */}
+
+          {responseData.drillDown && (
+            <div
+              style={{
+                background:
+                  "linear-gradient(135deg, #172554, #1e3a8a)",
+                padding: "20px",
+                borderRadius: "12px",
+                marginBottom: "20px",
+                border:
+                  "1px solid #3b82f6",
+              }}
+            >
+
+              <div
+                style={{
+                  fontSize: "18px",
+                  fontWeight: "bold",
+                  marginBottom: "5px",
+                }}
+              >
+                🔎 Root Cause Drill-Down
+              </div>
+
+              <p
+                style={{
+                  color: "#bfdbfe",
+                  marginTop: "5px",
+                  marginBottom: "20px",
+                }}
+              >
+                MetricMind identified the main
+                contributors to the profit result.
+              </p>
+
+              {/* ============================================== */}
+              {/* DRILL-DOWN CARDS */}
+              {/* ============================================== */}
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(210px, 1fr))",
+                  gap: "15px",
+                }}
+              >
+
+                {/* HIGHEST COST REGION */}
+
+                {responseData.drillDown
+                  .highestCostRegion && (
+                  <div
+                    style={{
+                      background: "#0f172a",
+                      padding: "16px",
+                      borderRadius: "10px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: "#94a3b8",
+                        fontSize: "12px",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      HIGHEST COST REGION
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: "20px",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {
+                        responseData.drillDown
+                          .highestCostRegion
+                      }
+                    </div>
+
+                    <div
+                      style={{
+                        color: "#f59e0b",
+                        marginTop: "8px",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {formatCurrency(
+                        responseData.drillDown
+                          .highestCostValue
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* LOWEST PROFIT REGION */}
+
+                {responseData.drillDown
+                  .lowestProfitRegion && (
+                  <div
+                    style={{
+                      background: "#0f172a",
+                      padding: "16px",
+                      borderRadius: "10px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: "#94a3b8",
+                        fontSize: "12px",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      LOWEST PROFIT REGION
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: "20px",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {
+                        responseData.drillDown
+                          .lowestProfitRegion
+                      }
+                    </div>
+
+                    <div
+                      style={{
+                        color: "#ef4444",
+                        marginTop: "8px",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {formatCurrency(
+                        responseData.drillDown
+                          .lowestProfitValue
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* LOWEST PROFIT PRODUCT */}
+
+                {responseData.drillDown
+                  .lowestProfitProduct && (
+                  <div
+                    style={{
+                      background: "#0f172a",
+                      padding: "16px",
+                      borderRadius: "10px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: "#94a3b8",
+                        fontSize: "12px",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      LOWEST PROFIT PRODUCT
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: "20px",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {
+                        responseData.drillDown
+                          .lowestProfitProduct
+                      }
+                    </div>
+
+                    <div
+                      style={{
+                        color: "#22c55e",
+                        marginTop: "8px",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {formatCurrency(
+                        responseData.drillDown
+                          .lowestProductProfit
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          )}
+
+          {/* ================================================== */}
+          {/* METRIC CARD */}
+          {/* ================================================== */}
+
+          {responseData.metric && (
+            <div
+              style={{
+                display: "flex",
+                gap: "15px",
+                flexWrap: "wrap",
+                marginBottom: "20px",
+              }}
+            >
+
+              <div
+                style={{
+                  background: "#0f172a",
+                  padding: "15px",
+                  borderRadius: "10px",
+                  minWidth: "180px",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#94a3b8",
+                    fontSize: "13px",
+                  }}
+                >
+                  METRIC
+                </div>
+
+                <strong
+                  style={{
+                    fontSize: "18px",
+                  }}
+                >
+                  {responseData.metric}
+                </strong>
+              </div>
+
+              {responseData.value !==
+                undefined && (
+                <div
+                  style={{
+                    background: "#0f172a",
+                    padding: "15px",
+                    borderRadius: "10px",
+                    minWidth: "180px",
+                  }}
+                >
+                  <div
+                    style={{
+                      color: "#94a3b8",
+                      fontSize: "13px",
+                    }}
+                  >
+                    VALUE
+                  </div>
+
+                  <strong
+                    style={{
+                      fontSize: "18px",
+                    }}
+                  >
+                    {formatCurrency(
+                      responseData.value
+                    )}
+                  </strong>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* ================================================== */}
+          {/* FILTERS */}
+          {/* ================================================== */}
+
+          {responseData.filters && (
+            <details
+              style={{
+                marginBottom: "15px",
+              }}
+            >
+              <summary
+                style={{
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                }}
+              >
+                🎯 Applied Filters
+              </summary>
+
+              <pre
+                style={{
+                  background: "#0f172a",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  overflowX: "auto",
+                }}
+              >
+                {JSON.stringify(
+                  responseData.filters,
+                  null,
+                  2
+                )}
+              </pre>
+            </details>
+          )}
+
+          {/* ================================================== */}
+          {/* AGENT STEPS */}
+          {/* ================================================== */}
+
+          {responseData.agentSteps &&
+            responseData.agentSteps.length >
+              0 && (
+              <div
+                style={{
+                  background: "#1e293b",
+                  padding: "16px",
+                  borderRadius: "10px",
+                  marginBottom: "20px",
+                }}
+              >
+                <strong>
+                  🧠 Agent Execution Steps
+                </strong>
+
+                <div
+                  style={{
+                    marginTop: "12px",
+                  }}
+                >
+                  {responseData.agentSteps.map(
+                    (step, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          padding: "8px 0",
+                          color: "#e2e8f0",
+                        }}
+                      >
+                        <span
+                          style={{
+                            color: "#22c55e",
+                            fontWeight: "bold",
+                            marginRight: "8px",
+                          }}
+                        >
+                          ✓
+                        </span>
+
+                        {step}
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+          {/* ================================================== */}
+          {/* GOVERNANCE */}
+          {/* ================================================== */}
+
+          {responseData.governance && (
+            <div
+              style={{
+                background: "#1e293b",
+                padding: "16px",
+                borderRadius: "10px",
+                marginBottom: "20px",
+              }}
+            >
+              <strong>
+                🔐 Query Governance
+              </strong>
+
+              <div
+                style={{
+                  marginTop: "12px",
+                  lineHeight: "1.8",
+                }}
+              >
+
+                {/* QUERY STATUS */}
+
+                <div>
+                  {responseData.governance.allowed ? (
+                    <span
+                      style={{
+                        color: "#22c55e",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      ✓ Query Approved
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        color: "#ef4444",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      ✕ Query Rejected
+                    </span>
+                  )}
+                </div>
+
+                {/* REASON */}
+
+                {responseData.governance.reason && (
+                  <div
+                    style={{
+                      color: "#cbd5e1",
+                      marginTop: "6px",
+                    }}
+                  >
+                    <strong>Reason:</strong>{" "}
+                    {responseData.governance.reason}
+                  </div>
+                )}
+
+                {/* DETERMINISTIC */}
+
+                {responseData.governance.deterministic !==
+                  undefined && (
+                  <div
+                    style={{
+                      marginTop: "8px",
+                      color:
+                        responseData.governance
+                          .deterministic
+                          ? "#22c55e"
+                          : "#f59e0b",
+                    }}
+                  >
+                    {responseData.governance
+                      .deterministic
+                      ? "✓ Deterministic execution"
+                      : "⚠ Non-deterministic execution"}
+                  </div>
+                )}
+
+                {/* SQL GENERATED BY LLM */}
+
+                {responseData.governance
+                  .sqlGeneratedByLLM !==
+                  undefined && (
+                  <div
+                    style={{
+                      marginTop: "8px",
+                      color:
+                        responseData.governance
+                          .sqlGeneratedByLLM
+                          ? "#f59e0b"
+                          : "#22c55e",
+                    }}
+                  >
+                    {responseData.governance
+                      .sqlGeneratedByLLM
+                      ? "⚠ SQL generated by LLM"
+                      : "✓ SQL not generated by LLM"}
+                  </div>
+                )}
+
+              </div>
+            </div>
+          )}
+
+          {/* ================================================== */}
+          {/* SEMANTIC METRIC */}
+          {/* ================================================== */}
+
+          {responseData.semanticMetric && (
+            <details
+              style={{
+                marginBottom: "15px",
+              }}
+            >
+              <summary
+                style={{
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                }}
+              >
+                📐 Semantic Metric Definition
+              </summary>
+
+              <div
+                style={{
+                  background: "#0f172a",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  marginTop: "10px",
+                }}
+              >
+
+                <div>
+                  <strong>Name:</strong>{" "}
+                  {responseData.semanticMetric.name}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "8px",
+                  }}
+                >
+                  <strong>Formula:</strong>{" "}
+                  {responseData.semanticMetric.formula}
+                </div>
+
+              </div>
+            </details>
+          )}
 
           {/* ================================================== */}
           {/* LINE CHART */}
           {/* ================================================== */}
 
           {chartData.length > 0 &&
-            chartType === "line" && (
+            responseData.chartType === "line" && (
               <div
                 style={{
                   background: "white",
@@ -241,6 +893,7 @@ function Chat() {
                   marginTop: "20px",
                 }}
               >
+
                 <h3
                   style={{
                     color: "#111827",
@@ -255,7 +908,10 @@ function Chat() {
                   height={300}
                 >
                   <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
+
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                    />
 
                     <XAxis
                       dataKey={xAxisKey}
@@ -265,21 +921,27 @@ function Chat() {
 
                     <Tooltip />
 
-                    <Line
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="#2563eb"
-                      strokeWidth={3}
-                    />
+                    {hasRevenue && (
+                      <Line
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#2563eb"
+                        strokeWidth={3}
+                      />
+                    )}
 
-                    <Line
-                      type="monotone"
-                      dataKey="profit"
-                      stroke="#ef4444"
-                      strokeWidth={3}
-                    />
+                    {hasProfit && (
+                      <Line
+                        type="monotone"
+                        dataKey="profit"
+                        stroke="#ef4444"
+                        strokeWidth={3}
+                      />
+                    )}
+
                   </LineChart>
                 </ResponsiveContainer>
+
               </div>
             )}
 
@@ -288,7 +950,7 @@ function Chat() {
           {/* ================================================== */}
 
           {chartData.length > 0 &&
-            chartType === "bar" && (
+            responseData.chartType === "bar" && (
               <div
                 style={{
                   background: "white",
@@ -297,25 +959,14 @@ function Chat() {
                   marginTop: "20px",
                 }}
               >
+
                 <h3
                   style={{
                     color: "#111827",
                     textAlign: "center",
                   }}
                 >
-                  {question
-                    .toLowerCase()
-                    .includes("region")
-                    ? "Regional Performance"
-                    : question
-                        .toLowerCase()
-                        .includes("country")
-                    ? "Country Performance"
-                    : question
-                        .toLowerCase()
-                        .includes("product")
-                    ? "Product Performance"
-                    : "Business Performance"}
+                  Business Performance
                 </h3>
 
                 <ResponsiveContainer
@@ -323,7 +974,10 @@ function Chat() {
                   height={300}
                 >
                   <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
+
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                    />
 
                     <XAxis
                       dataKey={xAxisKey}
@@ -333,12 +987,30 @@ function Chat() {
 
                     <Tooltip />
 
-                    <Bar
-                      dataKey="profit"
-                      fill="#2563eb"
-                    />
+                    {hasRevenue && (
+                      <Bar
+                        dataKey="revenue"
+                        fill="#2563eb"
+                      />
+                    )}
+
+                    {hasCost && (
+                      <Bar
+                        dataKey="cost"
+                        fill="#f59e0b"
+                      />
+                    )}
+
+                    {hasProfit && (
+                      <Bar
+                        dataKey="profit"
+                        fill="#22c55e"
+                      />
+                    )}
+
                   </BarChart>
                 </ResponsiveContainer>
+
               </div>
             )}
 
@@ -346,7 +1018,7 @@ function Chat() {
           {/* API CALL */}
           {/* ================================================== */}
 
-          {apiCall && (
+          {responseData.apiCall && (
             <details
               style={{
                 marginTop: "20px",
@@ -358,7 +1030,7 @@ function Chat() {
                   fontWeight: "bold",
                 }}
               >
-                🔍 View API Call
+                🔌 View API Call
               </summary>
 
               <div
@@ -367,9 +1039,11 @@ function Chat() {
                   background: "#0f172a",
                   padding: "12px",
                   borderRadius: "8px",
+                  fontFamily: "monospace",
+                  overflowX: "auto",
                 }}
               >
-                {apiCall}
+                {responseData.apiCall}
               </div>
             </details>
           )}
@@ -378,7 +1052,7 @@ function Chat() {
           {/* SQL */}
           {/* ================================================== */}
 
-          {sql && (
+          {responseData.sql && (
             <details
               style={{
                 marginTop: "10px",
@@ -390,24 +1064,29 @@ function Chat() {
                   fontWeight: "bold",
                 }}
               >
-                🗄️ View SQL
+                🗄️ View Generated SQL
               </summary>
 
-              <div
+              <pre
                 style={{
                   marginTop: "10px",
                   background: "#0f172a",
                   padding: "12px",
                   borderRadius: "8px",
                   overflowX: "auto",
+                  whiteSpace: "pre-wrap",
                 }}
               >
-                <code>{sql}</code>
-              </div>
+                <code>
+                  {responseData.sql}
+                </code>
+              </pre>
             </details>
           )}
+
         </div>
       )}
+
     </div>
   );
 }

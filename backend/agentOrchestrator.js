@@ -1,5 +1,6 @@
 // ============================================================
 // METRICMIND - AGENTIC ORCHESTRATOR
+// Axlero-style governed semantic BI agent
 // ============================================================
 
 import { validateQuery } from "./queryGovernance.js";
@@ -7,6 +8,7 @@ import { validateQuery } from "./queryGovernance.js";
 import {
   getMetric,
   calculateMetric,
+  filterData,
   regionAnalytics,
   countryAnalytics,
   monthlyAnalytics,
@@ -16,12 +18,157 @@ import {
 
 
 // ============================================================
-// 1. INTERPRET USER QUESTION
+// 1. EXTRACT BUSINESS FILTERS
+// ============================================================
+
+export function extractFilters(question) {
+
+  const q =
+    String(question || "").toLowerCase();
+
+  const filters = {};
+
+
+  // ==========================================================
+  // COUNTRY
+  // ==========================================================
+
+  if (q.includes("india")) {
+    filters.country = "India";
+  }
+
+  else if (q.includes("usa") || q.includes("us")) {
+    filters.country = "USA";
+  }
+
+  else if (
+    q.includes("germany") ||
+    q.includes("german")
+  ) {
+    filters.country = "Germany";
+  }
+
+  else if (
+    q.includes("france") ||
+    q.includes("french")
+  ) {
+    filters.country = "France";
+  }
+
+
+  // ==========================================================
+  // REGION
+  // ==========================================================
+
+  if (
+    q.includes("north america") ||
+    q.includes("north american")
+  ) {
+    filters.region = "North America";
+  }
+
+  else if (
+    q.includes("asia") ||
+    q.includes("asian")
+  ) {
+    filters.region = "Asia";
+  }
+
+  else if (
+    q.includes("europe") ||
+    q.includes("european")
+  ) {
+    filters.region = "Europe";
+  }
+
+
+  // ==========================================================
+  // PRODUCT
+  // ==========================================================
+
+  if (
+    q.includes("laptop") ||
+    q.includes("laptops")
+  ) {
+    filters.product = "Laptop";
+  }
+
+  else if (
+    q.includes("monitor") ||
+    q.includes("monitors")
+  ) {
+    filters.product = "Monitor";
+  }
+
+  else if (
+    q.includes("keyboard") ||
+    q.includes("keyboards")
+  ) {
+    filters.product = "Keyboard";
+  }
+
+
+  // ==========================================================
+  // MONTH
+  // ==========================================================
+
+  if (
+    q.includes("january") ||
+    q.includes("jan")
+  ) {
+    filters.month = "1";
+  }
+
+  else if (
+    q.includes("february") ||
+    q.includes("feb")
+  ) {
+    filters.month = "2";
+  }
+
+  else if (
+    q.includes("march") ||
+    q.includes("mar")
+  ) {
+    filters.month = "3";
+  }
+
+  else if (
+    q.includes("april") ||
+    q.includes("apr")
+  ) {
+    filters.month = "4";
+  }
+
+  else if (
+    q.includes("may")
+  ) {
+    filters.month = "5";
+  }
+
+  else if (
+    q.includes("june") ||
+    q.includes("jun")
+  ) {
+    filters.month = "6";
+  }
+
+
+  return filters;
+}
+
+
+// ============================================================
+// 2. INTERPRET USER QUESTION
 // ============================================================
 
 export function interpretQuestion(question) {
 
-  const q = String(question || "").toLowerCase();
+  const q =
+    String(question || "").toLowerCase();
+
+  const filters =
+    extractFilters(question);
 
 
   // ==========================================================
@@ -34,7 +181,8 @@ export function interpretQuestion(question) {
   ) {
     return {
       intent: "q3_revenue",
-      metric: "revenue"
+      metric: "revenue",
+      filters
     };
   }
 
@@ -51,13 +199,72 @@ export function interpretQuestion(question) {
       q.includes("decreased") ||
       q.includes("down") ||
       q.includes("fall") ||
-      q.includes("fell")
+      q.includes("fell") ||
+      q.includes("lower") ||
+      q.includes("drop") ||
+      q.includes("dropped")
     )
   ) {
     return {
       intent: "profit_root_cause",
-      metric: "profit"
+      metric: "profit",
+      filters
     };
+  }
+
+
+  // ==========================================================
+  // FILTERED METRIC QUERY
+  // ==========================================================
+
+  const hasFilters =
+    Object.keys(filters).length > 0;
+
+
+  if (hasFilters) {
+
+    if (q.includes("revenue")) {
+      return {
+        intent: "filtered_metric",
+        metric: "revenue",
+        filters
+      };
+    }
+
+    if (q.includes("cost")) {
+      return {
+        intent: "filtered_metric",
+        metric: "cost",
+        filters
+      };
+    }
+
+    if (q.includes("margin")) {
+      return {
+        intent: "filtered_metric",
+        metric: "margin",
+        filters
+      };
+    }
+
+    if (
+      q.includes("order") ||
+      q.includes("orders")
+    ) {
+      return {
+        intent: "filtered_metric",
+        metric: "orders",
+        filters
+      };
+    }
+
+    if (q.includes("profit")) {
+      return {
+        intent: "filtered_metric",
+        metric: "profit",
+        filters
+      };
+    }
   }
 
 
@@ -71,7 +278,8 @@ export function interpretQuestion(question) {
   ) {
     return {
       intent: "monthly_analysis",
-      metric: "revenue"
+      metric: "revenue",
+      filters
     };
   }
 
@@ -86,7 +294,8 @@ export function interpretQuestion(question) {
   ) {
     return {
       intent: "country_analysis",
-      metric: "revenue"
+      metric: "revenue",
+      filters
     };
   }
 
@@ -101,7 +310,8 @@ export function interpretQuestion(question) {
   ) {
     return {
       intent: "region_analysis",
-      metric: "revenue"
+      metric: "revenue",
+      filters
     };
   }
 
@@ -116,7 +326,8 @@ export function interpretQuestion(question) {
   ) {
     return {
       intent: "product_analysis",
-      metric: "profit"
+      metric: "profit",
+      filters
     };
   }
 
@@ -128,7 +339,8 @@ export function interpretQuestion(question) {
   if (q.includes("revenue")) {
     return {
       intent: "metric",
-      metric: "revenue"
+      metric: "revenue",
+      filters
     };
   }
 
@@ -140,7 +352,8 @@ export function interpretQuestion(question) {
   if (q.includes("cost")) {
     return {
       intent: "metric",
-      metric: "cost"
+      metric: "cost",
+      filters
     };
   }
 
@@ -152,7 +365,8 @@ export function interpretQuestion(question) {
   if (q.includes("margin")) {
     return {
       intent: "metric",
-      metric: "margin"
+      metric: "margin",
+      filters
     };
   }
 
@@ -167,7 +381,8 @@ export function interpretQuestion(question) {
   ) {
     return {
       intent: "metric",
-      metric: "orders"
+      metric: "orders",
+      filters
     };
   }
 
@@ -179,7 +394,8 @@ export function interpretQuestion(question) {
   if (q.includes("profit")) {
     return {
       intent: "metric",
-      metric: "profit"
+      metric: "profit",
+      filters
     };
   }
 
@@ -190,14 +406,14 @@ export function interpretQuestion(question) {
 
   return {
     intent: "unknown",
-    metric: null
+    metric: null,
+    filters
   };
 }
 
 
-
 // ============================================================
-// 2. EXECUTE AGENT
+// 3. EXECUTE AGENT
 // ============================================================
 
 export function executeAgent(question) {
@@ -240,6 +456,204 @@ export function executeAgent(question) {
   }
 
 
+  // ==========================================================
+  // FILTERED METRIC QUERY
+  // ==========================================================
+
+  if (
+    interpretation.intent ===
+    "filtered_metric"
+  ) {
+
+    const metric =
+      interpretation.metric;
+
+    const filters =
+      interpretation.filters || {};
+
+    const definition =
+      getMetric(metric);
+
+
+    if (!definition) {
+
+      return {
+        question,
+
+        interpretation:
+          "Unknown Metric",
+
+        metric: null,
+
+        value: null,
+
+        message:
+          "The requested metric does not exist in the MetricMind semantic layer.",
+
+        governance: {
+          allowed: false,
+          reason:
+            "Metric is not governed."
+        }
+      };
+    }
+
+
+    // --------------------------------------------------------
+    // APPLY FILTERS
+    // --------------------------------------------------------
+
+    const rows =
+      filterData(filters);
+
+
+    // --------------------------------------------------------
+    // CALCULATE METRIC
+    // --------------------------------------------------------
+
+    const value =
+      calculateMetric(
+        metric,
+        rows
+      );
+
+
+    const hasData =
+      rows.length > 0;
+
+
+    // --------------------------------------------------------
+    // FILTER DESCRIPTION
+    // --------------------------------------------------------
+
+    const filterParts = [];
+
+
+    if (filters.country) {
+      filterParts.push(
+        `country: ${filters.country}`
+      );
+    }
+
+    if (filters.region) {
+      filterParts.push(
+        `region: ${filters.region}`
+      );
+    }
+
+    if (filters.product) {
+      filterParts.push(
+        `product: ${filters.product}`
+      );
+    }
+
+
+    if (filters.month) {
+
+      const monthNames = [
+        "",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June"
+      ];
+
+      filterParts.push(
+        `month: ${
+          monthNames[
+            Number(filters.month)
+          ] || filters.month
+        }`
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // BUILD ANSWER
+    // --------------------------------------------------------
+
+    let message;
+
+
+    if (!hasData) {
+
+      message =
+        `No business data was found for the selected filters (${filterParts.join(", ")}). ` +
+        `The governed metric "${definition.name}" therefore returns ₹0.`;
+
+    } else {
+
+      const formattedValue =
+        metric === "margin"
+          ? `${Number(value.toFixed(2))}%`
+          : `₹${Number(value.toFixed(2)).toLocaleString("en-IN")}`;
+
+      message =
+        `${definition.name} for the selected filters is ${formattedValue}.`;
+    }
+
+
+    return {
+
+      question,
+
+      interpretation:
+        "Agentic Filtered Semantic Metric Query",
+
+      agentSteps: [
+        "Interpret user question",
+        "Extract business filters",
+        "Validate query through governance",
+        "Retrieve governed metric definition",
+        "Apply filters through semantic layer",
+        "Calculate deterministic metric",
+        "Generate business explanation"
+      ],
+
+      metric,
+
+      value:
+        Number(value.toFixed(2)),
+
+      filters,
+
+      rowCount:
+        rows.length,
+
+      semanticMetric: {
+        name:
+          definition.name,
+
+        description:
+          definition.description,
+
+        aggregation:
+          definition.aggregation
+      },
+
+      message,
+
+      governance: {
+        allowed: true,
+        deterministic: true,
+        sqlGeneratedByLLM: false,
+        reason:
+          "Query approved by MetricMind Governance."
+      },
+
+      apiCall:
+        `/api/metrics/${metric}${buildQueryString(filters)}`,
+
+      sql:
+        buildMetricSQL(
+          metric,
+          filters
+        )
+    };
+  }
+
 
   // ==========================================================
   // Q3 REVENUE
@@ -279,7 +693,9 @@ export function executeAgent(question) {
       governance: {
         allowed: true,
         deterministic: true,
-        sqlGeneratedByLLM: false
+        sqlGeneratedByLLM: false,
+        reason:
+          "Query approved by MetricMind Governance."
       },
 
       apiCall:
@@ -293,9 +709,8 @@ export function executeAgent(question) {
   }
 
 
-
   // ==========================================================
-  // PROFIT ROOT CAUSE - MULTI-STEP REASONING
+  // PROFIT ROOT CAUSE
   // ==========================================================
 
   if (
@@ -303,68 +718,94 @@ export function executeAgent(question) {
     "profit_root_cause"
   ) {
 
-    // --------------------------------------------------------
-    // STEP 1 - GOVERNED METRICS
-    // --------------------------------------------------------
+    const filters =
+      interpretation.filters || {};
+
+
+    const filteredRows =
+      Object.keys(filters).length > 0
+        ? filterData(filters)
+        : null;
+
 
     const totalRevenue =
-      calculateMetric("revenue");
+      filteredRows
+        ? calculateMetric(
+            "revenue",
+            filteredRows
+          )
+        : calculateMetric("revenue");
+
 
     const totalCost =
-      calculateMetric("cost");
+      filteredRows
+        ? calculateMetric(
+            "cost",
+            filteredRows
+          )
+        : calculateMetric("cost");
+
 
     const totalProfit =
-      calculateMetric("profit");
+      filteredRows
+        ? calculateMetric(
+            "profit",
+            filteredRows
+          )
+        : calculateMetric("profit");
 
 
     // --------------------------------------------------------
-    // STEP 2 - REGIONAL ANALYSIS
+    // REGIONAL ANALYSIS
     // --------------------------------------------------------
 
     const regions =
-      regionAnalytics();
+      filteredRows
+        ? regionAnalytics(filters)
+        : regionAnalytics();
 
 
     const highestCostRegion =
       [...regions].sort(
-        (a, b) => b.cost - a.cost
+        (a, b) =>
+          b.cost - a.cost
       )[0];
 
 
     const lowestProfitRegion =
       [...regions].sort(
-        (a, b) => a.profit - b.profit
+        (a, b) =>
+          a.profit - b.profit
       )[0];
 
 
     // --------------------------------------------------------
-    // STEP 3 - PRODUCT DRILL-DOWN
+    // PRODUCT DRILL-DOWN
     // --------------------------------------------------------
 
+    let regionalProducts = [];
+
+    let weakestProduct = null;
+
+
+    if (lowestProfitRegion) {
+
+      regionalProducts =
+        productAnalyticsByRegion(
+          lowestProfitRegion.region
+        );
+
+
+      weakestProduct =
+        [...regionalProducts].sort(
+          (a, b) =>
+            a.profit - b.profit
+        )[0];
+    }
+
+
     // --------------------------------------------------------
-// STEP 3 - REGION-SPECIFIC PRODUCT DRILL-DOWN
-// --------------------------------------------------------
-
-let regionalProducts = [];
-
-let weakestProduct = null;
-
-if (lowestProfitRegion) {
-
-  regionalProducts =
-    productAnalyticsByRegion(
-      lowestProfitRegion.region
-    );
-
-  weakestProduct =
-    [...regionalProducts].sort(
-      (a, b) => a.profit - b.profit
-    )[0];
-}
-
-
-    // --------------------------------------------------------
-    // STEP 4 - EXPLANATION
+    // EXPLANATION
     // --------------------------------------------------------
 
     let explanation =
@@ -391,16 +832,12 @@ if (lowestProfitRegion) {
 
     if (weakestProduct) {
 
-  explanation +=
-    `Within ${lowestProfitRegion.region}, ` +
-    `${weakestProduct.product} has the lowest product profit ` +
-    `at ₹${weakestProduct.profit.toLocaleString("en-IN")}.`;
-}
+      explanation +=
+        `Within ${lowestProfitRegion.region}, ` +
+        `${weakestProduct.product} has the lowest product profit ` +
+        `at ₹${weakestProduct.profit.toLocaleString("en-IN")}.`;
+    }
 
-
-    // --------------------------------------------------------
-    // STEP 5 - AGENT RESULT
-    // --------------------------------------------------------
 
     return {
 
@@ -410,39 +847,34 @@ if (lowestProfitRegion) {
         "Agentic Multi-Step Profit Root-Cause Analysis",
 
       agentSteps: [
-
         "Interpret user question",
-
         "Retrieve governed profit metric",
-
         "Calculate total revenue",
-
         "Calculate total cost",
-
         "Calculate total profit",
-
         "Query regional performance",
-
         "Identify highest-cost region",
-
         "Identify lowest-profit region",
-
         "Drill down into product performance",
-
         "Identify weakest product",
-
         "Generate root-cause explanation"
       ],
 
       metric: "profit",
 
-      value: totalProfit,
+      value:
+        totalProfit,
 
-      message: explanation,
+      message:
+        explanation,
 
-      data: regionalProducts,
+      data:
+        regionalProducts,
 
-      chartType: "bar",
+      chartType:
+        "bar",
+
+      filters,
 
       drillDown: {
 
@@ -467,13 +899,20 @@ if (lowestProfitRegion) {
             : null
       },
 
+      governance: {
+
+        allowed: true,
+
+        deterministic: true,
+
+        sqlGeneratedByLLM: false,
+
+        reason:
+          "Query approved by MetricMind Governance."
+      },
+
       apiCall:
-  "GET /api/analytics/product?region=" +
-  encodeURIComponent(
-    lowestProfitRegion
-      ? lowestProfitRegion.region
-      : ""
-  ),
+        "GET /api/analytics/product",
 
       sql:
         "SELECT region, " +
@@ -486,7 +925,6 @@ if (lowestProfitRegion) {
   }
 
 
-
   // ==========================================================
   // MONTHLY ANALYSIS
   // ==========================================================
@@ -496,6 +934,9 @@ if (lowestProfitRegion) {
     "monthly_analysis"
   ) {
 
+    const filters =
+      interpretation.filters || {};
+
     return {
 
       question,
@@ -503,19 +944,30 @@ if (lowestProfitRegion) {
       interpretation:
         "Agentic Monthly Analysis",
 
-      metric: "revenue",
+      metric:
+        "revenue",
+
+      filters,
 
       agentSteps: [
         "Interpret user question",
         "Identify Time dimension",
+        "Apply semantic filters",
         "Query monthly analytics",
         "Return time-series result"
       ],
 
       data:
-        monthlyAnalytics(),
+        monthlyAnalytics(filters),
 
-      chartType: "line",
+      chartType:
+        "line",
+
+      governance: {
+        allowed: true,
+        deterministic: true,
+        sqlGeneratedByLLM: false
+      },
 
       apiCall:
         "GET /api/analytics/monthly",
@@ -530,7 +982,6 @@ if (lowestProfitRegion) {
   }
 
 
-
   // ==========================================================
   // COUNTRY ANALYSIS
   // ==========================================================
@@ -540,6 +991,9 @@ if (lowestProfitRegion) {
     "country_analysis"
   ) {
 
+    const filters =
+      interpretation.filters || {};
+
     return {
 
       question,
@@ -547,201 +1001,44 @@ if (lowestProfitRegion) {
       interpretation:
         "Agentic Country Analysis",
 
-      metric: "revenue",
+      metric:
+        "revenue",
+
+      filters,
 
       agentSteps: [
         "Interpret user question",
         "Identify Geography dimension",
+        "Apply semantic filters",
         "Group revenue by country",
         "Return result"
       ],
 
       data:
-        countryAnalytics(),
+        countryAnalytics(filters),
 
-      chartType: "bar",
+      chartType:
+        "bar",
 
-      apiCall:
-        "GET /api/analytics/country",
+      governance: {
+        allowed: true,
 
-      sql:
-        "SELECT country, " +
-        "SUM(revenue) AS revenue " +
-        "FROM business_data " +
-        "GROUP BY country;"
-    };
-  }
+        deterministic: true,
 
+        sqlGeneratedByLLM: false
 
-
-  // ==========================================================
-  // REGION ANALYSIS
-  // ==========================================================
-
-  if (
-    interpretation.intent ===
-    "region_analysis"
-  ) {
-
-    return {
-
-      question,
-
-      interpretation:
-        "Agentic Regional Analysis",
-
-      metric: "revenue",
-
-      agentSteps: [
-        "Interpret user question",
-        "Identify Region dimension",
-        "Group revenue by region",
-        "Return result"
-      ],
-
-      data:
-        regionAnalytics(),
-
-      chartType: "bar",
-
-      apiCall:
-        "GET /api/analytics/region",
-
-      sql:
-        "SELECT region, " +
-        "SUM(revenue) AS revenue " +
-        "FROM business_data " +
-        "GROUP BY region;"
-    };
-  }
-
-
-
-  // ==========================================================
-  // PRODUCT ANALYSIS
-  // ==========================================================
-
-  if (
-    interpretation.intent ===
-    "product_analysis"
-  ) {
-
-    return {
-
-      question,
-
-      interpretation:
-        "Agentic Product Analysis",
-
-      metric: "profit",
-
-      agentSteps: [
-        "Interpret user question",
-        "Identify Product dimension",
-        "Calculate profit by product",
-        "Return result"
-      ],
-
-      data:
-        productAnalytics(),
-
-      chartType: "bar",
-
-      apiCall:
-        "GET /api/analytics/product",
-
-      sql:
-        "SELECT product, " +
-        "SUM(revenue) - SUM(cost) AS profit " +
-        "FROM business_data " +
-        "GROUP BY product;"
-    };
-  }
-
-
-
-  // ==========================================================
-  // SINGLE METRIC
-  // ==========================================================
-
-  if (
-    interpretation.intent ===
-    "metric"
-  ) {
-
-    const metric =
-      interpretation.metric;
-
-
-    const definition =
-      getMetric(metric);
-
-
-    if (!definition) {
-      return null;
-    }
-
-
-    const value =
-      calculateMetric(metric);
-
-
-    return {
-
-      question,
-
-      interpretation:
-        "Governed Semantic Metric Query",
-
-      agentSteps: [
-        "Interpret user question",
-        "Identify governed metric",
-        "Retrieve semantic definition",
-        "Calculate metric",
-        "Return result"
-      ],
-
-      metric,
-
-      value,
-
-      semanticMetric: {
-
-        name:
-          definition.name,
-
-        description:
-          definition.description,
-
-        aggregation:
-          definition.aggregation
       },
 
       apiCall:
-        `GET /api/metrics/${metric}`,
+        `/api/metrics/${metric}${buildQueryString(filters)}`,
 
       sql:
-
-        metric === "revenue"
-
-          ? "SELECT SUM(revenue) FROM business_data;"
-
-          : metric === "cost"
-
-          ? "SELECT SUM(cost) FROM business_data;"
-
-          : metric === "profit"
-
-          ? "SELECT SUM(revenue) - SUM(cost) FROM business_data;"
-
-          : metric === "orders"
-
-          ? "SELECT SUM(orders) FROM business_data;"
-
-          : "SELECT (SUM(revenue) - SUM(cost)) / SUM(revenue) * 100 FROM business_data;"
+        buildMetricSQL(
+          metric,
+          filters
+        )
     };
   }
-
 
 
   // ==========================================================
@@ -759,7 +1056,241 @@ if (lowestProfitRegion) {
 
     value: null,
 
+    filters:
+      interpretation.filters || {},
+
     message:
-      "I could not understand this business question. Please ask about revenue, cost, profit, margin, orders, monthly performance, countries, regions, products, or Q3 revenue."
+      "I could not understand this business question. Please ask about revenue, cost, profit, margin, orders, monthly performance, countries, regions, products, or Q3 revenue.",
+
+    governance: {
+
+      allowed: true,
+
+      deterministic: true,
+
+      sqlGeneratedByLLM: false
+
+    }
+
   };
+}
+// ============================================================
+// 4. BUILD QUERY STRING
+// ============================================================
+
+function buildQueryString(filters = {}) {
+
+  const params =
+    new URLSearchParams();
+
+
+  // ==========================================================
+  // COUNTRY
+  // ==========================================================
+
+  if (filters.country) {
+
+    params.set(
+      "country",
+      filters.country
+    );
+  }
+
+
+  // ==========================================================
+  // REGION
+  // ==========================================================
+
+  if (filters.region) {
+
+    params.set(
+      "region",
+      filters.region
+    );
+  }
+
+
+  // ==========================================================
+  // PRODUCT
+  // ==========================================================
+
+  if (filters.product) {
+
+    params.set(
+      "product",
+      filters.product
+    );
+  }
+
+
+  // ==========================================================
+  // MONTH
+  // ==========================================================
+
+  if (filters.month) {
+
+    params.set(
+      "month",
+      filters.month
+    );
+  }
+
+
+  const query =
+    params.toString();
+
+
+  return query
+    ? `?${query}`
+    : "";
+}
+
+
+// ============================================================
+// 5. BUILD DETERMINISTIC SQL REPRESENTATION
+// ============================================================
+
+function buildMetricSQL(
+  metric,
+  filters = {}
+) {
+
+  let formula;
+
+
+  // ==========================================================
+  // GOVERNED METRIC FORMULAS
+  // ==========================================================
+
+  switch (metric) {
+
+    case "revenue":
+
+      formula =
+        "SUM(revenue)";
+
+      break;
+
+
+    case "cost":
+
+      formula =
+        "SUM(cost)";
+
+      break;
+
+
+    case "profit":
+
+      formula =
+        "SUM(revenue) - SUM(cost)";
+
+      break;
+
+
+    case "orders":
+
+      formula =
+        "SUM(orders)";
+
+      break;
+
+
+    case "margin":
+
+      formula =
+        "(SUM(revenue) - SUM(cost)) / SUM(revenue) * 100";
+
+      break;
+
+
+    default:
+
+      formula =
+        "UNKNOWN_METRIC";
+  }
+
+
+  // ==========================================================
+  // BASE SQL
+  // ==========================================================
+
+  let sql =
+    `SELECT ${formula} FROM business_data`;
+
+
+  // ==========================================================
+  // FILTER CONDITIONS
+  // ==========================================================
+
+  const conditions = [];
+
+
+  // ----------------------------------------------------------
+  // COUNTRY FILTER
+  // ----------------------------------------------------------
+
+  if (filters.country) {
+
+    conditions.push(
+      `country = '${filters.country}'`
+    );
+  }
+
+
+  // ----------------------------------------------------------
+  // REGION FILTER
+  // ----------------------------------------------------------
+
+  if (filters.region) {
+
+    conditions.push(
+      `region = '${filters.region}'`
+    );
+  }
+
+
+  // ----------------------------------------------------------
+  // PRODUCT FILTER
+  // ----------------------------------------------------------
+
+  if (filters.product) {
+
+    conditions.push(
+      `product = '${filters.product}'`
+    );
+  }
+
+
+  // ----------------------------------------------------------
+  // MONTH FILTER
+  // ----------------------------------------------------------
+
+  if (filters.month) {
+
+    conditions.push(
+      `MONTH(date) = ${Number(filters.month)}`
+    );
+  }
+
+
+  // ==========================================================
+  // ADD WHERE CLAUSE
+  // ==========================================================
+
+  if (conditions.length > 0) {
+
+    sql +=
+      ` WHERE ${conditions.join(" AND ")}`;
+  }
+
+
+  // ==========================================================
+  // END SQL
+  // ==========================================================
+
+  sql += ";";
+
+
+  return sql;
 }

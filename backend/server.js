@@ -1,9 +1,11 @@
 // ============================================================
-// METRICMIND - AXlero STYLE SEMANTIC BI BACKEND
+// METRICMIND - AXLERO STYLE SEMANTIC BI BACKEND
 // ============================================================
 
 import express from "express";
 import cors from "cors";
+
+import { executeAgent } from "./agentOrchestrator.js";
 
 import businessData from "./data.js";
 
@@ -12,6 +14,7 @@ import {
   dimensions,
   getMetric,
   calculateMetric,
+  filterData,
   monthlyAnalytics,
   countryAnalytics,
   regionAnalytics,
@@ -30,6 +33,95 @@ app.use(cors());
 app.use(express.json());
 
 // ============================================================
+// HELPER - BUILD FILTERS FROM QUERY PARAMETERS
+// ============================================================
+
+function getFiltersFromQuery(query) {
+  const filters = {};
+
+  if (query.country) {
+    filters.country = String(query.country);
+  }
+
+  if (query.region) {
+    filters.region = String(query.region);
+  }
+
+  if (query.product) {
+    filters.product = String(query.product);
+  }
+
+  if (query.month) {
+    filters.month = String(query.month);
+  }
+
+  return filters;
+}
+
+// ============================================================
+// HELPER - APPLY ALL BUSINESS FILTERS
+// ============================================================
+//
+// Country, Region and Product are handled by the
+// semantic layer.
+//
+// Month is handled here using the transaction date.
+//
+// Example:
+// month=1  -> January
+// month=2  -> February
+// month=3  -> March
+// ...
+// month=12 -> December
+//
+// ============================================================
+
+function getFilteredRows(filters) {
+  // ----------------------------------------------------------
+  // STEP 1 - Apply semantic-layer filters
+  // ----------------------------------------------------------
+
+  const semanticFilters = {};
+
+  if (filters.country) {
+    semanticFilters.country = filters.country;
+  }
+
+  if (filters.region) {
+    semanticFilters.region = filters.region;
+  }
+
+  if (filters.product) {
+    semanticFilters.product = filters.product;
+  }
+
+  let rows = filterData(semanticFilters);
+
+  // ----------------------------------------------------------
+  // STEP 2 - Apply month filter
+  // ----------------------------------------------------------
+
+  if (filters.month) {
+    const selectedMonth = Number(filters.month);
+
+    if (
+      Number.isInteger(selectedMonth) &&
+      selectedMonth >= 1 &&
+      selectedMonth <= 12
+    ) {
+      rows = rows.filter((row) => {
+        const rowMonth =
+          new Date(row.date).getMonth() + 1;
+
+        return rowMonth === selectedMonth;
+      });
+    }
+  }
+
+  return rows;
+}
+
+// ============================================================
 // HOME
 // ============================================================
 
@@ -38,7 +130,7 @@ app.get("/", (req, res) => {
     project: "MetricMind",
     description: "Agentic Semantic BI Engine",
     status: "running",
-    version: "1.0.0"
+    version: "1.2.0"
   });
 });
 
@@ -69,328 +161,555 @@ app.get("/api/metrics", (req, res) => {
 
 // ============================================================
 // SINGLE GOVERNED METRIC
+// SUPPORTS BUSINESS FILTERS
+// ============================================================
+//
+// Examples:
+//
+// /api/metrics/revenue
+//
+// /api/metrics/revenue?country=India
+//
+// /api/metrics/revenue?region=Asia
+//
+// /api/metrics/revenue?product=Monitor
+//
+// /api/metrics/revenue?month=2
+//
+// /api/metrics/revenue?country=India&region=Asia&product=Monitor&month=2
+//
 // ============================================================
 
 app.get("/api/metrics/:metricName", (req, res) => {
-  const metricName = req.params.metricName.toLowerCase();
+  try {
+    const metricName =
+      req.params.metricName.toLowerCase();
 
-  const metric = getMetric(metricName);
+    const metric =
+      getMetric(metricName);
 
-  if (!metric) {
-    return res.status(404).json({
-      error: "Metric not found",
+    if (!metric) {
+      return res.status(404).json({
+        error: "Metric not found",
+        metric: metricName,
+        availableMetrics:
+          Object.keys(metrics)
+      });
+    }
+
+    const filters =
+      getFiltersFromQuery(req.query);
+
+    const rows =
+      getFilteredRows(filters);
+
+    const value =
+      calculateMetric(
+        metricName,
+        rows
+      );
+
+    res.json({
       metric: metricName,
-      availableMetrics: Object.keys(metrics)
+
+      name: metric.name,
+
+      value: Number(
+        value.toFixed(2)
+      ),
+
+      filters,
+
+      rowCount: rows.length,
+
+      source:
+        "MetricMind Semantic Layer"
+    });
+
+  } catch (error) {
+    console.error(
+      "Metric calculation error:",
+      error
+    );
+
+    res.status(500).json({
+      error:
+        "Unable to calculate metric"
     });
   }
-
-  const value = calculateMetric(metricName, businessData);
-
-  res.json({
-    metric: metricName,
-    name: metric.name,
-    value: Number(value.toFixed(2)),
-    source: "MetricMind Semantic Layer"
-  });
 });
 
 // ============================================================
 // MONTHLY ANALYTICS
 // ============================================================
 
-app.get("/api/analytics/monthly", (req, res) => {
-  res.json({
-    dimension: "Time",
-    data: monthlyAnalytics()
-  });
-});
+app.get(
+  "/api/analytics/monthly",
+  (req, res) => {
+    try {
+      res.json({
+        dimension: "Time",
+
+        data:
+          monthlyAnalytics()
+      });
+
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        error:
+          "Unable to calculate monthly analytics"
+      });
+    }
+  }
+);
 
 // ============================================================
 // COUNTRY ANALYTICS
 // ============================================================
 
-app.get("/api/analytics/country", (req, res) => {
-  res.json({
-    dimension: "Geography",
-    data: countryAnalytics()
-  });
-});
+app.get(
+  "/api/analytics/country",
+  (req, res) => {
+    try {
+      res.json({
+        dimension:
+          "Geography",
+
+        data:
+          countryAnalytics()
+      });
+
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        error:
+          "Unable to calculate country analytics"
+      });
+    }
+  }
+);
 
 // ============================================================
 // REGION ANALYTICS
 // ============================================================
 
-app.get("/api/analytics/region", (req, res) => {
-  res.json({
-    dimension: "Region",
-    data: regionAnalytics()
-  });
-});
+app.get(
+  "/api/analytics/region",
+  (req, res) => {
+    try {
+      res.json({
+        dimension:
+          "Region",
+
+        data:
+          regionAnalytics()
+      });
+
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        error:
+          "Unable to calculate region analytics"
+      });
+    }
+  }
+);
 
 // ============================================================
 // PRODUCT ANALYTICS
 // ============================================================
 
-app.get("/api/analytics/product", (req, res) => {
-  res.json({
-    dimension: "Product",
-    data: productAnalytics()
-  });
-});
+app.get(
+  "/api/analytics/product",
+  (req, res) => {
+    try {
+      res.json({
+        dimension:
+          "Product",
+
+        data:
+          productAnalytics()
+      });
+
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        error:
+          "Unable to calculate product analytics"
+      });
+    }
+  }
+);
+
+// ============================================================
+// FILTERED DASHBOARD ANALYTICS
+// ============================================================
+//
+// Supports:
+//
+// Country
+// Region
+// Product
+// Month
+//
+// Example:
+//
+// /api/analytics/filtered?country=India
+//
+// /api/analytics/filtered?country=India&region=Asia
+//
+// /api/analytics/filtered?country=India&region=Asia&product=Monitor
+//
+// /api/analytics/filtered?country=India&region=Asia&product=Monitor&month=2
+//
+// ============================================================
+
+app.get(
+  "/api/analytics/filtered",
+  (req, res) => {
+    try {
+
+      const filters =
+        getFiltersFromQuery(
+          req.query
+        );
+
+      const filteredRows =
+        getFilteredRows(filters);
+
+      const revenue =
+        calculateMetric(
+          "revenue",
+          filteredRows
+        );
+
+      const cost =
+        calculateMetric(
+          "cost",
+          filteredRows
+        );
+
+      const profit =
+        calculateMetric(
+          "profit",
+          filteredRows
+        );
+
+      const orders =
+        calculateMetric(
+          "orders",
+          filteredRows
+        );
+
+      const margin =
+        calculateMetric(
+          "margin",
+          filteredRows
+        );
+
+      res.json({
+
+        filters,
+
+        data: {
+
+          revenue,
+
+          cost,
+
+          profit,
+
+          orders,
+
+          margin:
+            Number(
+              margin.toFixed(2)
+            )
+        },
+
+        rowCount:
+          filteredRows.length,
+
+        source:
+          "MetricMind Semantic Layer"
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        "Filtered analytics error:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Unable to calculate filtered analytics."
+      });
+    }
+  }
+);
+
+// ============================================================
+// KPI SUMMARY
+// SUPPORTS BUSINESS FILTERS
+// ============================================================
+//
+// Examples:
+//
+// /api/analytics/summary
+//
+// /api/analytics/summary?country=India
+//
+// /api/analytics/summary?country=India&region=Asia
+//
+// /api/analytics/summary?country=India&region=Asia&product=Monitor&month=2
+//
+// ============================================================
+
+app.get(
+  "/api/analytics/summary",
+  (req, res) => {
+
+    try {
+
+      const filters =
+        getFiltersFromQuery(
+          req.query
+        );
+
+      const rows =
+        getFilteredRows(filters);
+
+      const revenue =
+        calculateMetric(
+          "revenue",
+          rows
+        );
+
+      const cost =
+        calculateMetric(
+          "cost",
+          rows
+        );
+
+      const profit =
+        calculateMetric(
+          "profit",
+          rows
+        );
+
+      const orders =
+        calculateMetric(
+          "orders",
+          rows
+        );
+
+      const margin =
+        calculateMetric(
+          "margin",
+          rows
+        );
+
+      res.json({
+
+        revenue,
+
+        cost,
+
+        profit,
+
+        orders,
+
+        margin:
+          Number(
+            margin.toFixed(2)
+          ),
+
+        filters,
+
+        rowCount:
+          rows.length,
+
+        source:
+          "MetricMind Semantic Layer"
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        "KPI summary error:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Unable to calculate KPI summary."
+      });
+    }
+  }
+);
 
 // ============================================================
 // NATURAL LANGUAGE QUERY
 // ============================================================
 
-app.post("/api/query", (req, res) => {
-  const question = String(req.body.question || "").toLowerCase();
+app.post(
+  "/api/query",
+  (req, res) => {
 
-  if (!question) {
-    return res.status(400).json({
-      error: "Question is required"
-    });
-  }
+    const rawQuestion =
+      String(
+        req.body.question || ""
+      );
 
-  // ----------------------------------------------------------
-  // Q3 REVENUE
-  // ----------------------------------------------------------
+    // --------------------------------------------------------
+    // VALIDATION
+    // --------------------------------------------------------
 
-  if (
-    question.includes("q3") &&
-    question.includes("revenue")
-  ) {
-    return res.json({
-      question: req.body.question,
-      interpretation: "Q3 Revenue",
-      metric: "revenue",
-      filters: {
-        quarter: "Q3"
-      },
-      value: 0,
-      message:
-        "Q3 data is not available in the current Jan-Jun mock dataset.",
-      apiCall: "GET /api/metrics/revenue",
-      sql:
-        "SELECT SUM(revenue) FROM business_data WHERE quarter = 'Q3';"
-    });
-  }
+    if (!rawQuestion.trim()) {
+      return res.status(400).json({
+        error:
+          "Question is required"
+      });
+    }
 
-  // ----------------------------------------------------------
-  // EUROPEAN SALES
-  // ----------------------------------------------------------
+    if (rawQuestion.length > 300) {
+      return res.status(400).json({
+        error:
+          "Query is too long",
 
-  if (
-    question.includes("europe") ||
-    question.includes("european")
-  ) {
-    const data = regionAnalytics().find(
-      (item) => item.region === "Europe"
+        maxCharacters: 300
+      });
+    }
+
+    // --------------------------------------------------------
+    // AGENT ORCHESTRATOR
+    // --------------------------------------------------------
+
+    const agentResult =
+      executeAgent(
+        rawQuestion.trim()
+      );
+
+    if (agentResult) {
+      return res.json(
+        agentResult
+      );
+    }
+
+    // --------------------------------------------------------
+    // FALLBACK
+    // --------------------------------------------------------
+
+    const question =
+      rawQuestion
+        .trim()
+        .toLowerCase();
+
+    console.log(
+      "Fallback query:",
+      question
     );
 
-    return res.json({
-      question: req.body.question,
-      interpretation: "European Sales",
-      metric: "revenue",
-      filters: {
-        region: "Europe"
-      },
-      data,
-      apiCall: "GET /api/analytics/region",
-      sql:
-        "SELECT region, SUM(revenue) FROM business_data WHERE region = 'Europe' GROUP BY region;"
+    // --------------------------------------------------------
+    // UNKNOWN QUERY
+    // --------------------------------------------------------
+
+    return res.status(400).json({
+
+      error:
+        "Query not understood",
+
+      supportedQueries: [
+
+        "Total Revenue",
+
+        "Total Cost",
+
+        "Total Profit",
+
+        "Profit Margin",
+
+        "Total Orders",
+
+        "Monthly Revenue",
+
+        "Country Performance",
+
+        "Regional Performance",
+
+        "European Sales",
+
+        "Profit by Product",
+
+        "Q3 Revenue"
+
+      ]
+
     });
   }
-
-  // ----------------------------------------------------------
-  // REVENUE
-  // ----------------------------------------------------------
-// ----------------------------------------------------------
-// MONTHLY ANALYTICS
-// ----------------------------------------------------------
-
-if (
-  question.includes("monthly") ||
-  question.includes("month")
-) {
-  const data = monthlyAnalytics();
-
-  return res.json({
-    question: req.body.question,
-    interpretation: "Monthly Revenue and Profit",
-    metric: "revenue",
-    data,
-    chartType: "line",
-    apiCall: "GET /api/analytics/monthly",
-    sql:
-      "SELECT month, SUM(revenue) AS revenue, SUM(revenue) - SUM(cost) AS profit FROM business_data GROUP BY month;"
-  });
-}
-  if (question.includes("revenue")) {
-    const value = calculateMetric("revenue");
-
-    return res.json({
-      question: req.body.question,
-      metric: "revenue",
-      value,
-      apiCall: "GET /api/metrics/revenue",
-      sql: "SELECT SUM(revenue) FROM business_data;"
-    });
-  }
-
-  // ----------------------------------------------------------
-  // COST
-  // ----------------------------------------------------------
-
-  if (question.includes("cost")) {
-    const value = calculateMetric("cost");
-
-    return res.json({
-      question: req.body.question,
-      metric: "cost",
-      value,
-      apiCall: "GET /api/metrics/cost",
-      sql: "SELECT SUM(cost) FROM business_data;"
-    });
-  }
-
-  // ----------------------------------------------------------
-  // PROFIT
-  // ----------------------------------------------------------
-
-  if (question.includes("profit")) {
-    const value = calculateMetric("profit");
-
-    return res.json({
-      question: req.body.question,
-      metric: "profit",
-      value,
-      apiCall: "GET /api/metrics/profit",
-      sql:
-        "SELECT SUM(revenue) - SUM(cost) FROM business_data;"
-    });
-  }
-
-  // ----------------------------------------------------------
-  // MARGIN
-  // ----------------------------------------------------------
-
-  if (question.includes("margin")) {
-    const value = calculateMetric("margin");
-
-    return res.json({
-      question: req.body.question,
-      metric: "margin",
-      value: Number(value.toFixed(2)),
-      unit: "%",
-      apiCall: "GET /api/metrics/margin",
-      sql:
-        "SELECT (SUM(revenue) - SUM(cost)) / SUM(revenue) * 100 FROM business_data;"
-    });
-  }
-
-   // MONTHLY ANALYTICS
-  // ----------------------------------------------------------
-
-  if (
-    question.includes("monthly") ||
-    question.includes("month") ||
-    question.includes("monthly revenue") ||
-    question.includes("monthly profit")
-  ) {
-    const data = monthlyAnalytics();
-
-    return res.json({
-      question: req.body.question,
-      interpretation: "Monthly Revenue and Profit",
-      metric: "revenue",
-      data,
-      chartType: "line",
-      apiCall: "GET /api/analytics/monthly",
-      sql:
-        "SELECT month, SUM(revenue) AS revenue, SUM(revenue) - SUM(cost) AS profit FROM business_data GROUP BY month;"
-    });
-  }
-  // ----------------------------------------------------------
-  // UNKNOWN QUERY
-  // ----------------------------------------------------------
-// ----------------------------------------------------------
-  // ----------------------------------------------------------
-// COUNTRY PERFORMANCE
-// ----------------------------------------------------------
-
-if (
-  question.includes("country") ||
-  question.includes("countries")
-) {
-  const data = countryAnalytics();
-
-  return res.json({
-    question: req.body.question,
-    interpretation: "Country Performance",
-    metric: "revenue",
-    filters: {
-      dimension: "country"
-    },
-    data,
-    chartType: "bar",
-    apiCall: "GET /api/analytics/country",
-    sql:
-      "SELECT country, SUM(revenue) FROM business_data GROUP BY country;"
-  });
-}
-
-  // ----------------------------------------------------------
-  // PRODUCT ANALYTICS
-  // ----------------------------------------------------------
-
-  if (
-    question.includes("product") ||
-    question.includes("products") ||
-    question.includes("profit by product")
-  ) {
-    const data = productAnalytics();
-
-    return res.json({
-      question: req.body.question,
-      interpretation: "Profit by Product",
-      metric: "profit",
-      data,
-      chartType: "bar",
-      apiCall: "GET /api/analytics/product",
-      sql:
-        "SELECT product, SUM(revenue) - SUM(cost) AS profit FROM business_data GROUP BY product;"
-    });
-  }
-  res.status(400).json({
-    error: "Query not understood",
-    supportedQueries: [
-      "Total Revenue",
-      "Total Cost",
-      "Total Profit",
-      "Profit Margin",
-      "European Sales",
-      "Q3 Revenue"
-    ]
-  });
-});
+);
 
 // ============================================================
 // 404 HANDLER
 // ============================================================
 
-app.use((req, res) => {
-  res.status(404).json({
-    error: "Endpoint not found",
-    path: req.originalUrl
-  });
-});
+app.use(
+  (req, res) => {
+
+    res.status(404).json({
+
+      error:
+        "Endpoint not found",
+
+      path:
+        req.originalUrl
+
+    });
+
+  }
+);
+
+// ============================================================
+// GLOBAL ERROR HANDLER
+// ============================================================
+
+app.use(
+  (error, req, res, next) => {
+
+    console.error(
+      "Server error:",
+      error
+    );
+
+    res.status(500).json({
+
+      error:
+        "Internal server error"
+
+    });
+
+  }
+);
 
 // ============================================================
 // START SERVER
 // ============================================================
 
-app.listen(PORT, () => {
-  console.log(
-    `MetricMind AI Backend running on http://localhost:${PORT}`
-  );
-});
+app.listen(
+  PORT,
+  () => {
+
+    console.log(
+      `MetricMind AI Backend running on http://localhost:${PORT}`
+    );
+
+  }
+);

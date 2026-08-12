@@ -11,6 +11,7 @@ const ALLOWED_INTENTS = [
   "country_analysis",
   "region_analysis",
   "product_analysis",
+  "filtered_metric",
   "metric"
 ];
 

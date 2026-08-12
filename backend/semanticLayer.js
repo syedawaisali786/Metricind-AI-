@@ -15,8 +15,13 @@ const metrics = {
     description: "Total business revenue",
     type: "number",
     aggregation: "SUM",
+
     calculate: (rows) =>
-      rows.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
+      rows.reduce(
+        (sum, row) =>
+          sum + Number(row.revenue || 0),
+        0
+      )
   },
 
   cost: {
@@ -24,8 +29,13 @@ const metrics = {
     description: "Total business cost",
     type: "number",
     aggregation: "SUM",
+
     calculate: (rows) =>
-      rows.reduce((sum, row) => sum + Number(row.cost || 0), 0)
+      rows.reduce(
+        (sum, row) =>
+          sum + Number(row.cost || 0),
+        0
+      )
   },
 
   profit: {
@@ -33,10 +43,13 @@ const metrics = {
     description: "Revenue minus cost",
     type: "number",
     aggregation: "CALCULATED",
+
     calculate: (rows) =>
       rows.reduce(
         (sum, row) =>
-          sum + Number(row.revenue || 0) - Number(row.cost || 0),
+          sum +
+          Number(row.revenue || 0) -
+          Number(row.cost || 0),
         0
       )
   },
@@ -46,20 +59,28 @@ const metrics = {
     description: "Profit divided by revenue",
     type: "percentage",
     aggregation: "CALCULATED",
+
     calculate: (rows) => {
       const revenue = rows.reduce(
-        (sum, row) => sum + Number(row.revenue || 0),
+        (sum, row) =>
+          sum + Number(row.revenue || 0),
         0
       );
 
       const cost = rows.reduce(
-        (sum, row) => sum + Number(row.cost || 0),
+        (sum, row) =>
+          sum + Number(row.cost || 0),
         0
       );
 
-      if (revenue === 0) return 0;
+      if (revenue === 0) {
+        return 0;
+      }
 
-      return ((revenue - cost) / revenue) * 100;
+      return (
+        ((revenue - cost) / revenue) *
+        100
+      );
     }
   },
 
@@ -68,8 +89,13 @@ const metrics = {
     description: "Total number of orders",
     type: "number",
     aggregation: "SUM",
+
     calculate: (rows) =>
-      rows.reduce((sum, row) => sum + Number(row.orders || 0), 0)
+      rows.reduce(
+        (sum, row) =>
+          sum + Number(row.orders || 0),
+        0
+      )
   }
 };
 
@@ -114,9 +140,15 @@ const dimensions = {
 // ============================================================
 
 function getMetric(metricName) {
-  if (!metricName) return null;
+  if (!metricName) {
+    return null;
+  }
 
-  return metrics[metricName.toLowerCase()] || null;
+  return (
+    metrics[
+      String(metricName).toLowerCase()
+    ] || null
+  );
 }
 
 // ============================================================
@@ -124,62 +156,262 @@ function getMetric(metricName) {
 // ============================================================
 
 function getDimension(dimensionName) {
-  if (!dimensionName) return null;
+  if (!dimensionName) {
+    return null;
+  }
 
-  return dimensions[dimensionName.toLowerCase()] || null;
+  return (
+    dimensions[
+      String(dimensionName).toLowerCase()
+    ] || null
+  );
 }
 
 // ============================================================
 // CALCULATE METRIC
 // ============================================================
 
-function calculateMetric(metricName, rows = businessData) {
-  const metric = getMetric(metricName);
+function calculateMetric(
+  metricName,
+  rows = businessData
+) {
+  const metric =
+    getMetric(metricName);
 
   if (!metric) {
-    throw new Error(`Unknown metric: ${metricName}`);
+    throw new Error(
+      `Unknown metric: ${metricName}`
+    );
   }
 
   return metric.calculate(rows);
 }
 
 // ============================================================
+// HELPER - GET MONTH FROM ROW
+// ============================================================
+//
+// Supports:
+// 1. row.month
+// 2. row.date
+//
+// Example:
+// date = "2026-02-15"
+// result = 2
+//
+// ============================================================
+
+function getRowMonth(row) {
+  // ----------------------------------------------------------
+  // If dataset already contains a month field
+  // ----------------------------------------------------------
+
+  if (
+    row.month !== undefined &&
+    row.month !== null &&
+    String(row.month).trim() !== ""
+  ) {
+    const monthNumber =
+      Number(row.month);
+
+    if (
+      Number.isInteger(monthNumber) &&
+      monthNumber >= 1 &&
+      monthNumber <= 12
+    ) {
+      return monthNumber;
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Otherwise use date
+  // ----------------------------------------------------------
+
+  if (
+    row.date === undefined ||
+    row.date === null
+  ) {
+    return null;
+  }
+
+  const dateString =
+    String(row.date).trim();
+
+  if (!dateString) {
+    return null;
+  }
+
+  // ----------------------------------------------------------
+  // Handle YYYY-MM-DD safely
+  // ----------------------------------------------------------
+
+  const directMatch =
+    dateString.match(
+      /^(\d{4})-(\d{1,2})-(\d{1,2})/
+    );
+
+  if (directMatch) {
+    return Number(
+      directMatch[2]
+    );
+  }
+
+  // ----------------------------------------------------------
+  // Handle DD-MM-YYYY
+  // ----------------------------------------------------------
+
+  const reverseMatch =
+    dateString.match(
+      /^(\d{1,2})-(\d{1,2})-(\d{4})/
+    );
+
+  if (reverseMatch) {
+    return Number(
+      reverseMatch[2]
+    );
+  }
+
+  // ----------------------------------------------------------
+  // Fallback to JavaScript Date
+  // ----------------------------------------------------------
+
+  const parsedDate =
+    new Date(dateString);
+
+  if (
+    !Number.isNaN(
+      parsedDate.getTime()
+    )
+  ) {
+    return (
+      parsedDate.getMonth() + 1
+    );
+  }
+
+  return null;
+}
+
+// ============================================================
 // FILTER DATA
+// ============================================================
+//
+// Supported filters:
+//
+// country
+// region
+// product
+// month
+//
+// All filters are combined using AND logic.
+//
+// Example:
+//
+// {
+//   country: "India",
+//   region: "Asia",
+//   product: "Monitor",
+//   month: "2"
+// }
+//
 // ============================================================
 
 function filterData(filters = {}) {
   let rows = [...businessData];
 
-  if (filters.country) {
+  // ==========================================================
+  // COUNTRY
+  // ==========================================================
+
+  if (
+    filters.country !== undefined &&
+    filters.country !== null &&
+    String(filters.country).trim() !== ""
+  ) {
+    const country =
+      String(filters.country)
+        .trim()
+        .toLowerCase();
+
     rows = rows.filter(
       (row) =>
-        row.country.toLowerCase() ===
-        String(filters.country).toLowerCase()
+        String(row.country || "")
+          .trim()
+          .toLowerCase() === country
     );
   }
 
-  if (filters.region) {
+  // ==========================================================
+  // REGION
+  // ==========================================================
+
+  if (
+    filters.region !== undefined &&
+    filters.region !== null &&
+    String(filters.region).trim() !== ""
+  ) {
+    const region =
+      String(filters.region)
+        .trim()
+        .toLowerCase();
+
     rows = rows.filter(
       (row) =>
-        row.region.toLowerCase() ===
-        String(filters.region).toLowerCase()
+        String(row.region || "")
+          .trim()
+          .toLowerCase() === region
     );
   }
 
-  if (filters.product) {
+  // ==========================================================
+  // PRODUCT
+  // ==========================================================
+
+  if (
+    filters.product !== undefined &&
+    filters.product !== null &&
+    String(filters.product).trim() !== ""
+  ) {
+    const product =
+      String(filters.product)
+        .trim()
+        .toLowerCase();
+
     rows = rows.filter(
       (row) =>
-        row.product.toLowerCase() ===
-        String(filters.product).toLowerCase()
+        String(row.product || "")
+          .trim()
+          .toLowerCase() === product
     );
   }
 
-  if (filters.month) {
-    rows = rows.filter(
-      (row) =>
-        new Date(row.date).getMonth() + 1 ===
-        Number(filters.month)
-    );
+  // ==========================================================
+  // MONTH
+  // ==========================================================
+
+  if (
+    filters.month !== undefined &&
+    filters.month !== null &&
+    String(filters.month).trim() !== ""
+  ) {
+    const requestedMonth =
+      Number(
+        String(filters.month).trim()
+      );
+
+    // Only apply valid month numbers
+    if (
+      Number.isInteger(
+        requestedMonth
+      ) &&
+      requestedMonth >= 1 &&
+      requestedMonth <= 12
+    ) {
+      rows = rows.filter(
+        (row) =>
+          getRowMonth(row) ===
+          requestedMonth
+      );
+    }
   }
 
   return rows;
@@ -209,16 +441,87 @@ function groupBy(rows, field) {
 // MONTHLY ANALYTICS
 // ============================================================
 
-function monthlyAnalytics() {
-  const groups = groupBy(businessData, "date");
+function monthlyAnalytics(
+  filters = {}
+) {
+  const filteredRows =
+    filterData(filters);
 
-  return Object.entries(groups).map(([date, rows]) => ({
-    month: date,
-    orders: calculateMetric("orders", rows),
-    revenue: calculateMetric("revenue", rows),
-    cost: calculateMetric("cost", rows),
-    profit: calculateMetric("profit", rows),
-    margin: Number(calculateMetric("margin", rows).toFixed(2))
+  const groups = {};
+
+  filteredRows.forEach((row) => {
+    let monthKey;
+
+    if (row.date) {
+      const dateString =
+        String(row.date);
+
+      const match =
+        dateString.match(
+          /^(\d{4})-(\d{1,2})/
+        );
+
+      if (match) {
+        monthKey =
+          `${match[1]}-${String(
+            match[2]
+          ).padStart(2, "0")}`;
+      }
+    }
+
+    if (!monthKey) {
+      const month =
+        getRowMonth(row);
+
+      monthKey =
+        month
+          ? `Month ${month}`
+          : "Unknown";
+    }
+
+    if (!groups[monthKey]) {
+      groups[monthKey] = [];
+    }
+
+    groups[monthKey].push(row);
+  });
+
+  return Object.entries(
+    groups
+  ).map(([month, rows]) => ({
+    month,
+
+    orders:
+      calculateMetric(
+        "orders",
+        rows
+      ),
+
+    revenue:
+      calculateMetric(
+        "revenue",
+        rows
+      ),
+
+    cost:
+      calculateMetric(
+        "cost",
+        rows
+      ),
+
+    profit:
+      calculateMetric(
+        "profit",
+        rows
+      ),
+
+    margin:
+      Number(
+        calculateMetric(
+          "margin",
+          rows
+        ).toFixed(2)
+      )
   }));
 }
 
@@ -226,16 +529,54 @@ function monthlyAnalytics() {
 // COUNTRY ANALYTICS
 // ============================================================
 
-function countryAnalytics() {
-  const groups = groupBy(businessData, "country");
+function countryAnalytics(
+  filters = {}
+) {
+  const filteredRows =
+    filterData(filters);
 
-  return Object.entries(groups).map(([country, rows]) => ({
+  const groups =
+    groupBy(
+      filteredRows,
+      "country"
+    );
+
+  return Object.entries(
+    groups
+  ).map(([country, rows]) => ({
     country,
-    orders: calculateMetric("orders", rows),
-    revenue: calculateMetric("revenue", rows),
-    cost: calculateMetric("cost", rows),
-    profit: calculateMetric("profit", rows),
-    margin: Number(calculateMetric("margin", rows).toFixed(2))
+
+    orders:
+      calculateMetric(
+        "orders",
+        rows
+      ),
+
+    revenue:
+      calculateMetric(
+        "revenue",
+        rows
+      ),
+
+    cost:
+      calculateMetric(
+        "cost",
+        rows
+      ),
+
+    profit:
+      calculateMetric(
+        "profit",
+        rows
+      ),
+
+    margin:
+      Number(
+        calculateMetric(
+          "margin",
+          rows
+        ).toFixed(2)
+      )
   }));
 }
 
@@ -243,16 +584,54 @@ function countryAnalytics() {
 // REGION ANALYTICS
 // ============================================================
 
-function regionAnalytics() {
-  const groups = groupBy(businessData, "region");
+function regionAnalytics(
+  filters = {}
+) {
+  const filteredRows =
+    filterData(filters);
 
-  return Object.entries(groups).map(([region, rows]) => ({
+  const groups =
+    groupBy(
+      filteredRows,
+      "region"
+    );
+
+  return Object.entries(
+    groups
+  ).map(([region, rows]) => ({
     region,
-    orders: calculateMetric("orders", rows),
-    revenue: calculateMetric("revenue", rows),
-    cost: calculateMetric("cost", rows),
-    profit: calculateMetric("profit", rows),
-    margin: Number(calculateMetric("margin", rows).toFixed(2))
+
+    orders:
+      calculateMetric(
+        "orders",
+        rows
+      ),
+
+    revenue:
+      calculateMetric(
+        "revenue",
+        rows
+      ),
+
+    cost:
+      calculateMetric(
+        "cost",
+        rows
+      ),
+
+    profit:
+      calculateMetric(
+        "profit",
+        rows
+      ),
+
+    margin:
+      Number(
+        calculateMetric(
+          "margin",
+          rows
+        ).toFixed(2)
+      )
   }));
 }
 
@@ -260,17 +639,132 @@ function regionAnalytics() {
 // PRODUCT ANALYTICS
 // ============================================================
 
-function productAnalytics() {
-  const groups = groupBy(businessData, "product");
+function productAnalytics(
+  filters = {}
+) {
+  const filteredRows =
+    filterData(filters);
 
-  return Object.entries(groups).map(([product, rows]) => ({
+  const groups =
+    groupBy(
+      filteredRows,
+      "product"
+    );
+
+  return Object.entries(
+    groups
+  ).map(([product, rows]) => ({
     product,
-    orders: calculateMetric("orders", rows),
-    revenue: calculateMetric("revenue", rows),
-    cost: calculateMetric("cost", rows),
-    profit: calculateMetric("profit", rows),
-    margin: Number(calculateMetric("margin", rows).toFixed(2))
+
+    orders:
+      calculateMetric(
+        "orders",
+        rows
+      ),
+
+    revenue:
+      calculateMetric(
+        "revenue",
+        rows
+      ),
+
+    cost:
+      calculateMetric(
+        "cost",
+        rows
+      ),
+
+    profit:
+      calculateMetric(
+        "profit",
+        rows
+      ),
+
+    margin:
+      Number(
+        calculateMetric(
+          "margin",
+          rows
+        ).toFixed(2)
+      )
   }));
+}
+
+// ============================================================
+// REGION → PRODUCT DRILL-DOWN
+// ============================================================
+
+function productAnalyticsByRegion(
+  region
+) {
+  if (!region) {
+    return [];
+  }
+
+  // ----------------------------------------------------------
+  // FILTER BY REGION
+  // ----------------------------------------------------------
+
+  const regionRows =
+    filterData({
+      region
+    });
+
+  // ----------------------------------------------------------
+  // GROUP BY PRODUCT
+  // ----------------------------------------------------------
+
+  const groups =
+    groupBy(
+      regionRows,
+      "product"
+    );
+
+  // ----------------------------------------------------------
+  // CALCULATE METRICS
+  // ----------------------------------------------------------
+
+  return Object.entries(
+    groups
+  ).map(
+    ([product, rows]) => ({
+      region,
+
+      product,
+
+      orders:
+        calculateMetric(
+          "orders",
+          rows
+        ),
+
+      revenue:
+        calculateMetric(
+          "revenue",
+          rows
+        ),
+
+      cost:
+        calculateMetric(
+          "cost",
+          rows
+        ),
+
+      profit:
+        calculateMetric(
+          "profit",
+          rows
+        ),
+
+      margin:
+        Number(
+          calculateMetric(
+            "margin",
+            rows
+          ).toFixed(2)
+        )
+    })
+  );
 }
 
 // ============================================================
@@ -288,5 +782,6 @@ export {
   monthlyAnalytics,
   countryAnalytics,
   regionAnalytics,
-  productAnalytics
+  productAnalytics,
+  productAnalyticsByRegion
 };

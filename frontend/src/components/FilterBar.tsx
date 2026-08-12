@@ -25,6 +25,66 @@ function FilterBar({
   onApply,
   onClear,
 }: FilterBarProps) {
+  // ==========================================================
+  // FILTER OPTIONS
+  // ==========================================================
+
+  const countries = [
+    "USA",
+    "India",
+    "Germany",
+    "France",
+  ];
+
+  const regions = [
+    "North America",
+    "Asia",
+    "Europe",
+  ];
+
+  const products = [
+    "Laptop",
+    "Monitor",
+    "Keyboard",
+  ];
+
+  const months = [
+    { value: "1", label: "January" },
+    { value: "2", label: "February" },
+    { value: "3", label: "March" },
+    { value: "4", label: "April" },
+    { value: "5", label: "May" },
+    { value: "6", label: "June" },
+  ];
+
+  // ==========================================================
+  // HELPERS
+  // ==========================================================
+
+  const selectStyle = {
+    width: "100%",
+    padding: "11px",
+    borderRadius: "8px",
+    border: "1px solid #d1d5db",
+    background: "#ffffff",
+    color: "#111827",
+    boxSizing: "border-box" as const,
+    fontSize: "14px",
+    cursor: "pointer",
+  };
+
+  const labelStyle = {
+    display: "block",
+    marginBottom: "6px",
+    color: "#374151",
+    fontWeight: "bold" as const,
+    fontSize: "14px",
+  };
+
+  // ==========================================================
+  // UI
+  // ==========================================================
+
   return (
     <div
       style={{
@@ -32,17 +92,20 @@ function FilterBar({
         padding: "20px",
         borderRadius: "12px",
         marginBottom: "20px",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+        boxShadow:
+          "0 2px 8px rgba(0,0,0,0.08)",
       }}
     >
+      {/* ==================================================== */}
       {/* HEADER */}
+      {/* ==================================================== */}
 
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: "15px",
+          marginBottom: "18px",
           flexWrap: "wrap",
           gap: "10px",
         }}
@@ -68,9 +131,44 @@ function FilterBar({
             Filter your business analytics
           </p>
         </div>
+
+        {/* ACTIVE FILTER COUNT */}
+
+        <div
+          style={{
+            background: "#eff6ff",
+            color: "#2563eb",
+            padding: "6px 12px",
+            borderRadius: "20px",
+            fontSize: "13px",
+            fontWeight: "bold",
+          }}
+        >
+          {
+            [
+              country,
+              region,
+              product,
+              month,
+            ].filter(Boolean).length
+          }{" "}
+          Active Filter
+          {
+            [
+              country,
+              region,
+              product,
+              month,
+            ].filter(Boolean).length !== 1
+              ? "s"
+              : ""
+          }
+        </div>
       </div>
 
-      {/* FILTERS */}
+      {/* ==================================================== */}
+      {/* FILTER GRID */}
+      {/* ==================================================== */}
 
       <div
         style={{
@@ -80,18 +178,12 @@ function FilterBar({
           gap: "15px",
         }}
       >
+        {/* ================================================== */}
         {/* COUNTRY */}
+        {/* ================================================== */}
 
         <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "6px",
-              color: "#374151",
-              fontWeight: "bold",
-              fontSize: "14px",
-            }}
-          >
+          <label style={labelStyle}>
             Country
           </label>
 
@@ -100,35 +192,29 @@ function FilterBar({
             onChange={(e) =>
               setCountry(e.target.value)
             }
-            style={{
-              width: "100%",
-              padding: "10px",
-              borderRadius: "8px",
-              border: "1px solid #d1d5db",
-              background: "#ffffff",
-              boxSizing: "border-box",
-            }}
+            style={selectStyle}
           >
-            <option value="">All Countries</option>
-            <option value="USA">USA</option>
-            <option value="India">India</option>
-            <option value="Germany">Germany</option>
-            <option value="France">France</option>
+            <option value="">
+              All Countries
+            </option>
+
+            {countries.map((item) => (
+              <option
+                key={item}
+                value={item}
+              >
+                {item}
+              </option>
+            ))}
           </select>
         </div>
 
+        {/* ================================================== */}
         {/* REGION */}
+        {/* ================================================== */}
 
         <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "6px",
-              color: "#374151",
-              fontWeight: "bold",
-              fontSize: "14px",
-            }}
-          >
+          <label style={labelStyle}>
             Region
           </label>
 
@@ -137,36 +223,29 @@ function FilterBar({
             onChange={(e) =>
               setRegion(e.target.value)
             }
-            style={{
-              width: "100%",
-              padding: "10px",
-              borderRadius: "8px",
-              border: "1px solid #d1d5db",
-              background: "#ffffff",
-              boxSizing: "border-box",
-            }}
+            style={selectStyle}
           >
-            <option value="">All Regions</option>
-            <option value="North America">
-              North America
+            <option value="">
+              All Regions
             </option>
-            <option value="Asia">Asia</option>
-            <option value="Europe">Europe</option>
+
+            {regions.map((item) => (
+              <option
+                key={item}
+                value={item}
+              >
+                {item}
+              </option>
+            ))}
           </select>
         </div>
 
+        {/* ================================================== */}
         {/* PRODUCT */}
+        {/* ================================================== */}
 
         <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "6px",
-              color: "#374151",
-              fontWeight: "bold",
-              fontSize: "14px",
-            }}
-          >
+          <label style={labelStyle}>
             Product
           </label>
 
@@ -175,34 +254,29 @@ function FilterBar({
             onChange={(e) =>
               setProduct(e.target.value)
             }
-            style={{
-              width: "100%",
-              padding: "10px",
-              borderRadius: "8px",
-              border: "1px solid #d1d5db",
-              background: "#ffffff",
-              boxSizing: "border-box",
-            }}
+            style={selectStyle}
           >
-            <option value="">All Products</option>
-            <option value="Laptop">Laptop</option>
-            <option value="Monitor">Monitor</option>
-            <option value="Keyboard">Keyboard</option>
+            <option value="">
+              All Products
+            </option>
+
+            {products.map((item) => (
+              <option
+                key={item}
+                value={item}
+              >
+                {item}
+              </option>
+            ))}
           </select>
         </div>
 
+        {/* ================================================== */}
         {/* MONTH */}
+        {/* ================================================== */}
 
         <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "6px",
-              color: "#374151",
-              fontWeight: "bold",
-              fontSize: "14px",
-            }}
-          >
+          <label style={labelStyle}>
             Month
           </label>
 
@@ -211,27 +285,111 @@ function FilterBar({
             onChange={(e) =>
               setMonth(e.target.value)
             }
-            style={{
-              width: "100%",
-              padding: "10px",
-              borderRadius: "8px",
-              border: "1px solid #d1d5db",
-              background: "#ffffff",
-              boxSizing: "border-box",
-            }}
+            style={selectStyle}
           >
-            <option value="">All Months</option>
-            <option value="1">January</option>
-            <option value="2">February</option>
-            <option value="3">March</option>
-            <option value="4">April</option>
-            <option value="5">May</option>
-            <option value="6">June</option>
+            <option value="">
+              All Months
+            </option>
+
+            {months.map((item) => (
+              <option
+                key={item.value}
+                value={item.value}
+              >
+                {item.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
+      {/* ==================================================== */}
+      {/* SELECTED FILTER SUMMARY */}
+      {/* ==================================================== */}
+
+      {(country ||
+        region ||
+        product ||
+        month) && (
+        <div
+          style={{
+            marginTop: "18px",
+            padding: "12px",
+            background: "#f8fafc",
+            borderRadius: "8px",
+            border:
+              "1px solid #e2e8f0",
+          }}
+        >
+          <strong
+            style={{
+              color: "#374151",
+              fontSize: "13px",
+            }}
+          >
+            Active Filters:
+          </strong>
+
+          <div
+            style={{
+              marginTop: "7px",
+              color: "#64748b",
+              fontSize: "14px",
+            }}
+          >
+            {country && (
+              <span>
+                Country:{" "}
+                <strong>{country}</strong>
+              </span>
+            )}
+
+            {region && (
+              <span
+                style={{
+                  marginLeft: "15px",
+                }}
+              >
+                Region:{" "}
+                <strong>{region}</strong>
+              </span>
+            )}
+
+            {product && (
+              <span
+                style={{
+                  marginLeft: "15px",
+                }}
+              >
+                Product:{" "}
+                <strong>{product}</strong>
+              </span>
+            )}
+
+            {month && (
+              <span
+                style={{
+                  marginLeft: "15px",
+                }}
+              >
+                Month:{" "}
+                <strong>
+                  {
+                    months.find(
+                      (item) =>
+                        item.value === month
+                    )?.label
+                  }
+                </strong>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
       {/* BUTTONS */}
+      {/* ==================================================== */}
 
       <div
         style={{
@@ -246,14 +404,14 @@ function FilterBar({
           style={{
             padding: "10px 20px",
             background: "#2563eb",
-            color: "white",
+            color: "#ffffff",
             border: "none",
             borderRadius: "8px",
             cursor: "pointer",
             fontWeight: "bold",
           }}
         >
-          Apply Filters
+          ✓ Apply Filters
         </button>
 
         <button
@@ -268,7 +426,7 @@ function FilterBar({
             fontWeight: "bold",
           }}
         >
-          Clear Filters
+          ↺ Clear Filters
         </button>
       </div>
     </div>

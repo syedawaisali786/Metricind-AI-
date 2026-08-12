@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import RevenueChart from "./components/charts/RevenueChart";
 import SalesChart from "./components/charts/SalesChart";
@@ -6,68 +6,69 @@ import RegionChart from "./components/RegionChart";
 import RegionalPerformance from "./components/RegionalPerformance";
 import MonthlyPerformance from "./components/MonthlyPerformance";
 import CountryPerformance from "./components/CountryPerformance";
+import KPICards from "./components/KPICards";
+import FilterBar from "./components/FilterBar";
 import Chat from "./Chat";
 
-const API_URL = "http://localhost:5000";
-
 function App() {
-  const [revenue, setRevenue] = useState<number | null>(null);
-  const [profit, setProfit] = useState<number | null>(null);
-  const [orders, setOrders] = useState<number | null>(null);
-  const [margin, setMargin] = useState<number | null>(null);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   // ============================================================
-  // LOAD KPI SUMMARY
+  // BUSINESS FILTER STATE
   // ============================================================
 
-  useEffect(() => {
-    async function loadMetrics() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const response = await fetch(
-          `${API_URL}/api/analytics/summary`
-        );
-
-        if (!response.ok) {
-          throw new Error("Unable to load KPI summary");
-        }
-
-        const data = await response.json();
-
-        setRevenue(data.revenue);
-        setProfit(data.profit);
-        setOrders(data.orders);
-        setMargin(data.margin);
-      } catch (err) {
-        console.error(err);
-        setError(
-          "Could not connect to MetricMind backend."
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadMetrics();
-  }, []);
+  const [country, setCountry] = useState("");
+  const [region, setRegion] = useState("");
+  const [product, setProduct] = useState("");
+  const [month, setMonth] = useState("");
 
   // ============================================================
-  // FORMAT CURRENCY
+  // APPLIED FILTERS
   // ============================================================
 
-  const formatCurrency = (value: number | null) => {
-    if (value === null) {
-      return "...";
-    }
+  const [appliedFilters, setAppliedFilters] = useState({
+    country: "",
+    region: "",
+    product: "",
+    month: "",
+  });
 
-    return `₹${value.toLocaleString("en-IN", {
-      maximumFractionDigits: 0,
-    })}`;
+  // ============================================================
+  // APPLY FILTERS
+  // ============================================================
+
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      country,
+      region,
+      product,
+      month,
+    });
+
+    console.log("Applied business filters:", {
+      country,
+      region,
+      product,
+      month,
+    });
+  };
+
+  // ============================================================
+  // CLEAR FILTERS
+  // ============================================================
+
+  const handleClearFilters = () => {
+    setCountry("");
+    setRegion("");
+    setProduct("");
+    setMonth("");
+
+    setAppliedFilters({
+      country: "",
+      region: "",
+      product: "",
+      month: "",
+    });
+
+    console.log("Business filters cleared");
   };
 
   // ============================================================
@@ -100,7 +101,8 @@ function App() {
             padding: "24px",
             borderRadius: "12px",
             marginBottom: "20px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+            boxShadow:
+              "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
           <h1
@@ -124,20 +126,75 @@ function App() {
         </div>
 
         {/* ================================================== */}
-        {/* ERROR MESSAGE */}
+        {/* BUSINESS FILTER */}
         {/* ================================================== */}
 
-        {error && (
+        <FilterBar
+          country={country}
+          region={region}
+          product={product}
+          month={month}
+          setCountry={setCountry}
+          setRegion={setRegion}
+          setProduct={setProduct}
+          setMonth={setMonth}
+          onApply={handleApplyFilters}
+          onClear={handleClearFilters}
+        />
+
+        {/* ================================================== */}
+        {/* ACTIVE FILTER DISPLAY */}
+        {/* ================================================== */}
+
+        {(appliedFilters.country ||
+          appliedFilters.region ||
+          appliedFilters.product ||
+          appliedFilters.month) && (
           <div
             style={{
-              background: "#fee2e2",
-              color: "#991b1b",
-              padding: "15px",
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              padding: "14px 18px",
               borderRadius: "10px",
+              marginTop: "15px",
               marginBottom: "20px",
+              color: "#1e3a8a",
             }}
           >
-            {error}
+            <strong>Active Filters:</strong>
+
+            <div
+              style={{
+                marginTop: "8px",
+                display: "flex",
+                gap: "10px",
+                flexWrap: "wrap",
+              }}
+            >
+              {appliedFilters.country && (
+                <span>
+                  Country: {appliedFilters.country}
+                </span>
+              )}
+
+              {appliedFilters.region && (
+                <span>
+                  Region: {appliedFilters.region}
+                </span>
+              )}
+
+              {appliedFilters.product && (
+                <span>
+                  Product: {appliedFilters.product}
+                </span>
+              )}
+
+              {appliedFilters.month && (
+                <span>
+                  Month: {appliedFilters.month}
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -145,151 +202,15 @@ function App() {
         {/* KPI CARDS */}
         {/* ================================================== */}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(4, minmax(0, 1fr))",
-            gap: "20px",
-            marginBottom: "20px",
-          }}
-        >
-
-          {/* REVENUE */}
-
-          <div
-            style={{
-              background: "#ffffff",
-              padding: "20px",
-              borderRadius: "12px",
-              boxShadow:
-                "0 2px 8px rgba(0,0,0,0.08)",
-            }}
-          >
-            <p
-              style={{
-                color: "#6b7280",
-                margin: 0,
-              }}
-            >
-              Revenue
-            </p>
-
-            <h2
-              style={{
-                margin: "8px 0 0",
-                color: "#111827",
-              }}
-            >
-              {loading
-                ? "Loading..."
-                : formatCurrency(revenue)}
-            </h2>
-          </div>
-
-          {/* PROFIT */}
-
-          <div
-            style={{
-              background: "#ffffff",
-              padding: "20px",
-              borderRadius: "12px",
-              boxShadow:
-                "0 2px 8px rgba(0,0,0,0.08)",
-            }}
-          >
-            <p
-              style={{
-                color: "#6b7280",
-                margin: 0,
-              }}
-            >
-              Profit
-            </p>
-
-            <h2
-              style={{
-                margin: "8px 0 0",
-                color: "#111827",
-              }}
-            >
-              {loading
-                ? "Loading..."
-                : formatCurrency(profit)}
-            </h2>
-          </div>
-
-          {/* ORDERS */}
-
-          <div
-            style={{
-              background: "#ffffff",
-              padding: "20px",
-              borderRadius: "12px",
-              boxShadow:
-                "0 2px 8px rgba(0,0,0,0.08)",
-            }}
-          >
-            <p
-              style={{
-                color: "#6b7280",
-                margin: 0,
-              }}
-            >
-              Orders
-            </p>
-
-            <h2
-              style={{
-                margin: "8px 0 0",
-                color: "#111827",
-              }}
-            >
-              {loading
-                ? "Loading..."
-                : orders !== null
-                ? orders.toLocaleString("en-IN")
-                : "..."}
-            </h2>
-          </div>
-
-          {/* MARGIN */}
-
-          <div
-            style={{
-              background: "#ffffff",
-              padding: "20px",
-              borderRadius: "12px",
-              boxShadow:
-                "0 2px 8px rgba(0,0,0,0.08)",
-            }}
-          >
-            <p
-              style={{
-                color: "#6b7280",
-                margin: 0,
-              }}
-            >
-              Margin
-            </p>
-
-            <h2
-              style={{
-                margin: "8px 0 0",
-                color: "#111827",
-              }}
-            >
-              {loading
-                ? "Loading..."
-                : margin !== null
-                ? `${margin.toFixed(1)}%`
-                : "..."}
-            </h2>
-          </div>
-        </div>
+        <KPICards
+          country={country}
+          region={region}
+          product={product}
+          month={month}
+        />
 
         {/* ================================================== */}
-        {/* ANALYTICS CHARTS */}
+        {/* ANALYTICS */}
         {/* ================================================== */}
 
         <RevenueChart />
