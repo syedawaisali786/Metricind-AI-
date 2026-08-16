@@ -2,6 +2,7 @@
 // METRICMIND - MOCK BUSINESS DATA
 // ============================================================
 
+// Existing business data
 const businessData = [
   // JANUARY
   {
@@ -159,5 +160,150 @@ const businessData = [
     materialCost: 7600
   }
 ];
+
+// ============================================================
+// COMPLETE FILTER COVERAGE
+// ============================================================
+
+const countries = [
+  {
+    country: "USA",
+    region: "North America"
+  },
+  {
+    country: "India",
+    region: "Asia"
+  },
+  {
+    country: "Germany",
+    region: "Europe"
+  },
+  {
+    country: "France",
+    region: "Europe"
+  }
+];
+
+const products = [
+  "Laptop",
+  "Monitor",
+  "Keyboard"
+];
+
+const months = [
+  {
+    number: 1,
+    name: "January"
+  },
+  {
+    number: 2,
+    name: "February"
+  },
+  {
+    number: 3,
+    name: "March"
+  },
+  {
+    number: 4,
+    name: "April"
+  },
+  {
+    number: 5,
+    name: "May"
+  },
+  {
+    number: 6,
+    name: "June"
+  }
+];
+
+// ============================================================
+// FIND EXISTING COMBINATIONS
+// ============================================================
+
+const existingCombinations = new Set(
+  businessData.map(row =>
+    `${row.country}|${row.product}|${row.date.substring(0, 7)}`
+  )
+);
+
+// ============================================================
+// GENERATE MISSING COMBINATIONS
+// ============================================================
+
+let nextId = businessData.length + 1;
+
+countries.forEach(({ country, region }) => {
+
+  products.forEach(product => {
+
+    months.forEach(({ number }) => {
+
+      const monthKey = `2026-${String(number).padStart(2, "0")}`;
+
+      const combinationKey =
+        `${country}|${product}|${monthKey}`;
+
+      // Do not replace existing real/mock records
+      if (existingCombinations.has(combinationKey)) {
+        return;
+      }
+
+      // Deterministic values for missing combinations
+      const baseRevenue =
+        country === "USA"
+          ? 10000
+          : country === "India"
+          ? 8500
+          : country === "Germany"
+          ? 9000
+          : 9500;
+
+      const productMultiplier =
+        product === "Laptop"
+          ? 1.20
+          : product === "Monitor"
+          ? 1.00
+          : 0.75;
+
+      const monthMultiplier = 1 + (number - 1) * 0.03;
+
+      const revenue = Math.round(
+        baseRevenue *
+        productMultiplier *
+        monthMultiplier
+      );
+
+      const cost = Math.round(revenue * 0.60);
+
+      const shippingCost = Math.round(revenue * 0.05);
+
+      const materialCost = Math.round(
+        cost - shippingCost
+      );
+
+      businessData.push({
+        id: nextId++,
+        date: `2026-${String(number).padStart(2, "0")}-15`,
+        country,
+        region,
+        product,
+        orders: 1,
+        revenue,
+        cost,
+        shippingCost,
+        materialCost
+      });
+    });
+  });
+});
+
+// ============================================================
+// EXPORT
+// ============================================================
+
+console.log(
+  `MetricMind: ${businessData.length} total business records loaded`
+);
 
 export default businessData;

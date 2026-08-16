@@ -32,8 +32,12 @@ type DrillDown = {
   lowestProfitRegion?: string | null;
   lowestProfitValue?: number | null;
 
-  lowestProfitProduct?: string | null;
-  lowestProductProfit?: number | null;
+  weakestProduct?: string | null;
+  weakestProductProfit?: number | null;
+
+  shippingCost?: number | null;
+  materialCost?: number | null;
+  
 };
 
 type QueryResponse = {
@@ -51,7 +55,7 @@ type QueryResponse = {
 
   data?: Record<string, unknown>[];
 
-  chartType?: "line" | "bar";
+  chartType?: "line" | "bar" | "card";
 
   apiCall?: string;
 
@@ -62,6 +66,8 @@ type QueryResponse = {
   semanticMetric?: {
     name?: string;
     formula?: string;
+    description?: string;
+    aggregation?: string;
   };
 
   governance?: Governance;
@@ -107,8 +113,18 @@ function Chat() {
         }
       );
 
+      if (!response.ok) {
+        throw new Error(
+          `Backend returned ${response.status}`
+        );
+      }
+
       const data: QueryResponse =
         await response.json();
+        console.log("FULL API RESPONSE:", data);
+console.log("DRILL DOWN:", data?.drillDown);
+console.log("SHIPPING:", data?.drillDown?.shippingCost);
+console.log("MATERIAL:", data?.drillDown?.materialCost);
 
       setResponseData(data);
 
@@ -116,8 +132,17 @@ function Chat() {
       console.error(error);
 
       setResponseData({
+        interpretation:
+          "Backend Connection Error",
+
         message:
           "Unable to connect to MetricMind backend. Make sure the backend is running on port 5000.",
+
+        governance: {
+          allowed: false,
+          reason:
+            "Backend connection failed.",
+        },
       });
 
     } finally {
@@ -190,7 +215,9 @@ function Chat() {
       return "N/A";
     }
 
-    return `₹${value.toLocaleString("en-IN")}`;
+    return `₹${Number(value).toLocaleString(
+      "en-IN"
+    )}`;
   };
 
   // ============================================================
@@ -251,7 +278,8 @@ function Chat() {
           width: "100%",
           padding: "14px",
           borderRadius: "10px",
-          border: "1px solid #475569",
+          border:
+            "1px solid #475569",
           background: "#f8fafc",
           color: "#111827",
           marginTop: "15px",
@@ -381,6 +409,8 @@ function Chat() {
               }}
             >
 
+              {/* ROOT CAUSE TITLE */}
+
               <div
                 style={{
                   fontSize: "18px",
@@ -415,7 +445,9 @@ function Chat() {
                 }}
               >
 
+                {/* ========================================== */}
                 {/* HIGHEST COST REGION */}
+                {/* ========================================== */}
 
                 {responseData.drillDown
                   .highestCostRegion && (
@@ -463,7 +495,9 @@ function Chat() {
                   </div>
                 )}
 
+                {/* ========================================== */}
                 {/* LOWEST PROFIT REGION */}
+                {/* ========================================== */}
 
                 {responseData.drillDown
                   .lowestProfitRegion && (
@@ -511,10 +545,12 @@ function Chat() {
                   </div>
                 )}
 
-                {/* LOWEST PROFIT PRODUCT */}
+                {/* ========================================== */}
+                {/* WEAKEST PRODUCT */}
+                {/* ========================================== */}
 
                 {responseData.drillDown
-                  .lowestProfitProduct && (
+                  .weakestProduct && (
                   <div
                     style={{
                       background: "#0f172a",
@@ -529,7 +565,7 @@ function Chat() {
                         marginBottom: "8px",
                       }}
                     >
-                      LOWEST PROFIT PRODUCT
+                      WEAKEST PRODUCT
                     </div>
 
                     <div
@@ -540,26 +576,122 @@ function Chat() {
                     >
                       {
                         responseData.drillDown
-                          .lowestProfitProduct
+                          .weakestProduct
                       }
                     </div>
 
                     <div
                       style={{
-                        color: "#22c55e",
+                        color: "#ef4444",
                         marginTop: "8px",
                         fontWeight: "bold",
                       }}
                     >
                       {formatCurrency(
                         responseData.drillDown
-                          .lowestProductProfit
+                          .weakestProductProfit
                       )}
                     </div>
                   </div>
                 )}
 
               </div>
+
+              {/* ============================================== */}
+              {/* STEP 4 - COST BREAKDOWN */}
+              {/* ============================================== */}
+
+              {responseData.drillDown && (
+  <div
+    style={{
+      marginTop: "20px",
+      background: "#0f172a",
+      padding: "18px",
+      borderRadius: "10px",
+    }}
+  >
+    <h3
+      style={{
+        color: "#ffffff",
+        marginBottom: "14px",
+      }}
+    >
+      💰 Cost Breakdown
+    </h3>
+
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "14px",
+      }}
+    >
+      {/* SHIPPING COST */}
+      <div
+        style={{
+          background: "#1e293b",
+          padding: "14px",
+          borderRadius: "8px",
+        }}
+      >
+        <div
+          style={{
+            color: "#94a3b8",
+            fontSize: "12px",
+            marginBottom: "6px",
+          }}
+        >
+          SHIPPING COST
+        </div>
+
+        <strong
+          style={{
+            fontSize: "18px",
+            color: "#f59e0b",
+          }}
+        >
+          {responseData.drillDown.shippingCost != null
+            ? `₹${Number(
+                responseData.drillDown.shippingCost
+              ).toLocaleString("en-IN")}`
+            : "N/A"}
+        </strong>
+      </div>
+
+      {/* MATERIAL COST */}
+      <div
+        style={{
+          background: "#1e293b",
+          padding: "14px",
+          borderRadius: "8px",
+        }}
+      >
+        <div
+          style={{
+            color: "#94a3b8",
+            fontSize: "12px",
+            marginBottom: "6px",
+          }}
+        >
+          MATERIAL COST
+        </div>
+
+        <strong
+          style={{
+            fontSize: "18px",
+            color: "#ef4444",
+          }}
+        >
+          {responseData.drillDown.materialCost != null
+            ? `₹${Number(
+                responseData.drillDown.materialCost
+              ).toLocaleString("en-IN")}`
+            : "N/A"}
+        </strong>
+      </div>
+    </div>
+  </div>
+)}
             </div>
           )}
 
@@ -576,6 +708,8 @@ function Chat() {
                 marginBottom: "20px",
               }}
             >
+
+              {/* METRIC */}
 
               <div
                 style={{
@@ -603,488 +737,526 @@ function Chat() {
                 </strong>
               </div>
 
-              {responseData.value !==
-                undefined && (
-                <div
-                  style={{
-                    background: "#0f172a",
-                    padding: "15px",
-                    borderRadius: "10px",
-                    minWidth: "180px",
-                  }}
-                >
-                  <div
-                    style={{
-                      color: "#94a3b8",
-                      fontSize: "13px",
-                    }}
-                  >
-                    VALUE
-                  </div>
+              {/* ================================================== */}
+          {/* VALUE */}
+          {/* ================================================== */}
 
-                  <strong
-                    style={{
-                      fontSize: "18px",
-                    }}
-                  >
-                    {formatCurrency(
-                      responseData.value
-                    )}
-                  </strong>
-                </div>
-              )}
+          {responseData.value !== undefined && (
+            <div
+              style={{
+                background: "#0f172a",
+                padding: "15px",
+                borderRadius: "10px",
+                minWidth: "180px",
+              }}
+            >
+              <div
+                style={{
+                  color: "#94a3b8",
+                  fontSize: "13px",
+                }}
+              >
+                VALUE
+              </div>
 
+              <strong
+                style={{
+                  fontSize: "18px",
+                }}
+              >
+                {formatCurrency(responseData.value)}
+              </strong>
             </div>
           )}
 
-          {/* ================================================== */}
-          {/* FILTERS */}
-          {/* ================================================== */}
-
-          {responseData.filters && (
-            <details
-              style={{
-                marginBottom: "15px",
-              }}
-            >
-              <summary
-                style={{
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                }}
-              >
-                🎯 Applied Filters
-              </summary>
-
-              <pre
-                style={{
-                  background: "#0f172a",
-                  padding: "12px",
-                  borderRadius: "8px",
-                  overflowX: "auto",
-                }}
-              >
-                {JSON.stringify(
-                  responseData.filters,
-                  null,
-                  2
-                )}
-              </pre>
-            </details>
+            </div>
           )}
+        </div>
+      )}
 
-          {/* ================================================== */}
-          {/* AGENT STEPS */}
-          {/* ================================================== */}
+      {/* ====================================================== */}
+      {/* FILTERS */}
+      {/* ====================================================== */}
 
-          {responseData.agentSteps &&
-            responseData.agentSteps.length >
-              0 && (
-              <div
-                style={{
-                  background: "#1e293b",
-                  padding: "16px",
-                  borderRadius: "10px",
-                  marginBottom: "20px",
-                }}
-              >
-                <strong>
-                  🧠 Agent Execution Steps
-                </strong>
+      {responseData?.filters && (
+        <details
+          style={{
+            marginBottom: "15px",
+          }}
+        >
+          <summary
+            style={{
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            🎯 Applied Filters
+          </summary>
 
-                <div
-                  style={{
-                    marginTop: "12px",
-                  }}
-                >
-                  {responseData.agentSteps.map(
-                    (step, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          padding: "8px 0",
-                          color: "#e2e8f0",
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: "#22c55e",
-                            fontWeight: "bold",
-                            marginRight: "8px",
-                          }}
-                        >
-                          ✓
-                        </span>
-
-                        {step}
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
+          <pre
+            style={{
+              background: "#0f172a",
+              padding: "12px",
+              borderRadius: "8px",
+              overflowX: "auto",
+            }}
+          >
+            {JSON.stringify(
+              responseData.filters,
+              null,
+              2
             )}
+          </pre>
+        </details>
+      )}
 
-          {/* ================================================== */}
-          {/* GOVERNANCE */}
-          {/* ================================================== */}
+      {/* ====================================================== */}
+      {/* AGENT EXECUTION STEPS */}
+      {/* ====================================================== */}
 
-          {responseData.governance && (
+      {responseData?.agentSteps &&
+        responseData.agentSteps.length > 0 && (
+          <div
+            style={{
+              background: "#1e293b",
+              padding: "16px",
+              borderRadius: "10px",
+              marginBottom: "20px",
+            }}
+          >
+            <strong>
+              🧠 Agent Execution Steps
+            </strong>
+
             <div
               style={{
-                background: "#1e293b",
-                padding: "16px",
-                borderRadius: "10px",
-                marginBottom: "20px",
+                marginTop: "12px",
               }}
             >
-              <strong>
-                🔐 Query Governance
-              </strong>
-
-              <div
-                style={{
-                  marginTop: "12px",
-                  lineHeight: "1.8",
-                }}
-              >
-
-                {/* QUERY STATUS */}
-
-                <div>
-                  {responseData.governance.allowed ? (
+              {responseData.agentSteps.map(
+                (step, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: "8px 0",
+                      color: "#e2e8f0",
+                    }}
+                  >
                     <span
                       style={{
                         color: "#22c55e",
                         fontWeight: "bold",
+                        marginRight: "8px",
                       }}
                     >
-                      ✓ Query Approved
+                      ✓
                     </span>
-                  ) : (
-                    <span
-                      style={{
-                        color: "#ef4444",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      ✕ Query Rejected
-                    </span>
-                  )}
-                </div>
 
-                {/* REASON */}
-
-                {responseData.governance.reason && (
-                  <div
-                    style={{
-                      color: "#cbd5e1",
-                      marginTop: "6px",
-                    }}
-                  >
-                    <strong>Reason:</strong>{" "}
-                    {responseData.governance.reason}
+                    {step}
                   </div>
-                )}
-
-                {/* DETERMINISTIC */}
-
-                {responseData.governance.deterministic !==
-                  undefined && (
-                  <div
-                    style={{
-                      marginTop: "8px",
-                      color:
-                        responseData.governance
-                          .deterministic
-                          ? "#22c55e"
-                          : "#f59e0b",
-                    }}
-                  >
-                    {responseData.governance
-                      .deterministic
-                      ? "✓ Deterministic execution"
-                      : "⚠ Non-deterministic execution"}
-                  </div>
-                )}
-
-                {/* SQL GENERATED BY LLM */}
-
-                {responseData.governance
-                  .sqlGeneratedByLLM !==
-                  undefined && (
-                  <div
-                    style={{
-                      marginTop: "8px",
-                      color:
-                        responseData.governance
-                          .sqlGeneratedByLLM
-                          ? "#f59e0b"
-                          : "#22c55e",
-                    }}
-                  >
-                    {responseData.governance
-                      .sqlGeneratedByLLM
-                      ? "⚠ SQL generated by LLM"
-                      : "✓ SQL not generated by LLM"}
-                  </div>
-                )}
-
-              </div>
+                )
+              )}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* ================================================== */}
-          {/* SEMANTIC METRIC */}
-          {/* ================================================== */}
+      {/* ====================================================== */}
+      {/* GOVERNANCE */}
+      {/* ====================================================== */}
 
-          {responseData.semanticMetric && (
-            <details
-              style={{
-                marginBottom: "15px",
-              }}
-            >
-              <summary
-                style={{
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                }}
-              >
-                📐 Semantic Metric Definition
-              </summary>
+      {responseData?.governance && (
+        <div
+          style={{
+            background: "#1e293b",
+            padding: "16px",
+            borderRadius: "10px",
+            marginBottom: "20px",
+          }}
+        >
+          <strong>
+            🔐 Query Governance
+          </strong>
 
-              <div
-                style={{
-                  background: "#0f172a",
-                  padding: "12px",
-                  borderRadius: "8px",
-                  marginTop: "10px",
-                }}
-              >
+          <div
+            style={{
+              marginTop: "12px",
+              lineHeight: "1.8",
+            }}
+          >
 
-                <div>
-                  <strong>Name:</strong>{" "}
-                  {responseData.semanticMetric.name}
-                </div>
+            {/* QUERY STATUS */}
 
-                <div
+            <div>
+              {responseData.governance.allowed ? (
+                <span
                   style={{
-                    marginTop: "8px",
+                    color: "#22c55e",
+                    fontWeight: "bold",
                   }}
                 >
-                  <strong>Formula:</strong>{" "}
-                  {responseData.semanticMetric.formula}
-                </div>
-
-              </div>
-            </details>
-          )}
-
-          {/* ================================================== */}
-          {/* LINE CHART */}
-          {/* ================================================== */}
-
-          {chartData.length > 0 &&
-            responseData.chartType === "line" && (
-              <div
-                style={{
-                  background: "white",
-                  padding: "15px",
-                  borderRadius: "10px",
-                  marginTop: "20px",
-                }}
-              >
-
-                <h3
+                  ✓ Query Approved
+                </span>
+              ) : (
+                <span
                   style={{
-                    color: "#111827",
-                    textAlign: "center",
+                    color: "#ef4444",
+                    fontWeight: "bold",
                   }}
                 >
-                  Monthly Revenue & Profit
-                </h3>
+                  ✕ Query Rejected
+                </span>
+              )}
+            </div>
 
-                <ResponsiveContainer
-                  width="100%"
-                  height={300}
-                >
-                  <LineChart data={chartData}>
+            {/* REASON */}
 
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                    />
-
-                    <XAxis
-                      dataKey={xAxisKey}
-                    />
-
-                    <YAxis />
-
-                    <Tooltip />
-
-                    {hasRevenue && (
-                      <Line
-                        type="monotone"
-                        dataKey="revenue"
-                        stroke="#2563eb"
-                        strokeWidth={3}
-                      />
-                    )}
-
-                    {hasProfit && (
-                      <Line
-                        type="monotone"
-                        dataKey="profit"
-                        stroke="#ef4444"
-                        strokeWidth={3}
-                      />
-                    )}
-
-                  </LineChart>
-                </ResponsiveContainer>
-
+            {responseData.governance.reason && (
+              <div
+                style={{
+                  color: "#cbd5e1",
+                  marginTop: "6px",
+                }}
+              >
+                <strong>
+                  Reason:
+                </strong>{" "}
+                {responseData.governance.reason}
               </div>
             )}
 
-          {/* ================================================== */}
-          {/* BAR CHART */}
-          {/* ================================================== */}
+            {/* DETERMINISTIC */}
 
-          {chartData.length > 0 &&
-            responseData.chartType === "bar" && (
+            {responseData.governance
+              .deterministic !== undefined && (
               <div
                 style={{
-                  background: "white",
-                  padding: "15px",
-                  borderRadius: "10px",
-                  marginTop: "20px",
+                  marginTop: "8px",
+                  color:
+                    responseData.governance
+                      .deterministic
+                      ? "#22c55e"
+                      : "#f59e0b",
                 }}
               >
-
-                <h3
-                  style={{
-                    color: "#111827",
-                    textAlign: "center",
-                  }}
-                >
-                  Business Performance
-                </h3>
-
-                <ResponsiveContainer
-                  width="100%"
-                  height={300}
-                >
-                  <BarChart data={chartData}>
-
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                    />
-
-                    <XAxis
-                      dataKey={xAxisKey}
-                    />
-
-                    <YAxis />
-
-                    <Tooltip />
-
-                    {hasRevenue && (
-                      <Bar
-                        dataKey="revenue"
-                        fill="#2563eb"
-                      />
-                    )}
-
-                    {hasCost && (
-                      <Bar
-                        dataKey="cost"
-                        fill="#f59e0b"
-                      />
-                    )}
-
-                    {hasProfit && (
-                      <Bar
-                        dataKey="profit"
-                        fill="#22c55e"
-                      />
-                    )}
-
-                  </BarChart>
-                </ResponsiveContainer>
-
+                {responseData.governance
+                  .deterministic
+                  ? "✓ Deterministic execution"
+                  : "⚠ Non-deterministic execution"}
               </div>
             )}
 
-          {/* ================================================== */}
-          {/* API CALL */}
-          {/* ================================================== */}
+            {/* SQL GENERATED BY LLM */}
 
-          {responseData.apiCall && (
-            <details
-              style={{
-                marginTop: "20px",
-              }}
-            >
-              <summary
-                style={{
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                }}
-              >
-                🔌 View API Call
-              </summary>
-
+            {responseData.governance
+              .sqlGeneratedByLLM !== undefined && (
               <div
                 style={{
-                  marginTop: "10px",
-                  background: "#0f172a",
-                  padding: "12px",
-                  borderRadius: "8px",
-                  fontFamily: "monospace",
-                  overflowX: "auto",
+                  marginTop: "8px",
+                  color:
+                    responseData.governance
+                      .sqlGeneratedByLLM
+                      ? "#f59e0b"
+                      : "#22c55e",
                 }}
               >
-                {responseData.apiCall}
+                {responseData.governance
+                  .sqlGeneratedByLLM
+                  ? "⚠ SQL generated by LLM"
+                  : "✓ SQL not generated by LLM"}
               </div>
-            </details>
-          )}
+            )}
 
-          {/* ================================================== */}
-          {/* SQL */}
-          {/* ================================================== */}
-
-          {responseData.sql && (
-            <details
-              style={{
-                marginTop: "10px",
-              }}
-            >
-              <summary
-                style={{
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                }}
-              >
-                🗄️ View Generated SQL
-              </summary>
-
-              <pre
-                style={{
-                  marginTop: "10px",
-                  background: "#0f172a",
-                  padding: "12px",
-                  borderRadius: "8px",
-                  overflowX: "auto",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                <code>
-                  {responseData.sql}
-                </code>
-              </pre>
-            </details>
-          )}
-
+          </div>
         </div>
+      )}
+
+      {/* ====================================================== */}
+      {/* SEMANTIC METRIC */}
+      {/* ====================================================== */}
+
+      {responseData?.semanticMetric && (
+        <details
+          style={{
+            marginBottom: "15px",
+          }}
+        >
+          <summary
+            style={{
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            📐 Semantic Metric Definition
+          </summary>
+
+          <div
+            style={{
+              background: "#0f172a",
+              padding: "12px",
+              borderRadius: "8px",
+              marginTop: "10px",
+            }}
+          >
+            <div>
+              <strong>
+                Name:
+              </strong>{" "}
+              {responseData.semanticMetric.name}
+            </div>
+
+            {responseData.semanticMetric
+              .description && (
+              <div
+                style={{
+                  marginTop: "8px",
+                }}
+              >
+                <strong>
+                  Description:
+                </strong>{" "}
+                {
+                  responseData.semanticMetric
+                    .description
+                }
+              </div>
+            )}
+
+            {responseData.semanticMetric
+              .formula && (
+              <div
+                style={{
+                  marginTop: "8px",
+                }}
+              >
+                <strong>
+                  Formula:
+                </strong>{" "}
+                {
+                  responseData.semanticMetric
+                    .formula
+                }
+              </div>
+            )}
+
+            {responseData.semanticMetric
+              .aggregation && (
+              <div
+                style={{
+                  marginTop: "8px",
+                }}
+              >
+                <strong>
+                  Aggregation:
+                </strong>{" "}
+                {
+                  responseData.semanticMetric
+                    .aggregation
+                }
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
+      {/* ====================================================== */}
+      {/* LINE CHART */}
+      {/* ====================================================== */}
+
+      {chartData.length > 0 &&
+        responseData?.chartType === "line" && (
+          <div
+            style={{
+              background: "white",
+              padding: "15px",
+              borderRadius: "10px",
+              marginTop: "20px",
+            }}
+          >
+            <h3
+              style={{
+                color: "#111827",
+                textAlign: "center",
+              }}
+            >
+              Monthly Revenue & Profit
+            </h3>
+
+            <ResponsiveContainer
+              width="100%"
+              height={300}
+            >
+              <LineChart
+                data={chartData}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                />
+
+                <XAxis
+                  dataKey={xAxisKey}
+                />
+
+                <YAxis />
+
+                <Tooltip />
+
+                {hasRevenue && (
+                  <Line
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#2563eb"
+                    strokeWidth={3}
+                  />
+                )}
+
+                {hasProfit && (
+                  <Line
+                    type="monotone"
+                    dataKey="profit"
+                    stroke="#ef4444"
+                    strokeWidth={3}
+                  />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+      {/* ====================================================== */}
+      {/* BAR CHART */}
+      {/* ====================================================== */}
+
+      {chartData.length > 0 &&
+        responseData?.chartType === "bar" && (
+          <div
+            style={{
+              background: "white",
+              padding: "15px",
+              borderRadius: "10px",
+              marginTop: "20px",
+            }}
+          >
+            <h3
+              style={{
+                color: "#111827",
+                textAlign: "center",
+              }}
+            >
+              Business Performance
+            </h3>
+
+            <ResponsiveContainer
+              width="100%"
+              height={300}
+            >
+              <BarChart
+                data={chartData}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                />
+
+                <XAxis
+                  dataKey={xAxisKey}
+                />
+
+                <YAxis />
+
+                <Tooltip />
+
+                {hasRevenue && (
+                  <Bar
+                    dataKey="revenue"
+                    fill="#2563eb"
+                  />
+                )}
+
+                {hasCost && (
+                  <Bar
+                    dataKey="cost"
+                    fill="#f59e0b"
+                  />
+                )}
+
+                {hasProfit && (
+                  <Bar
+                    dataKey="profit"
+                    fill="#22c55e"
+                  />
+                )}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+      {/* ====================================================== */}
+      {/* API CALL */}
+      {/* ====================================================== */}
+
+      {responseData?.apiCall && (
+        <details
+          style={{
+            marginTop: "20px",
+          }}
+        >
+          <summary
+            style={{
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            🔌 View API Call
+          </summary>
+
+          <div
+            style={{
+              marginTop: "10px",
+              background: "#0f172a",
+              padding: "12px",
+              borderRadius: "8px",
+              fontFamily: "monospace",
+              overflowX: "auto",
+            }}
+          >
+            {responseData.apiCall}
+          </div>
+        </details>
+      )}
+
+      {/* ====================================================== */}
+      {/* SQL */}
+      {/* ====================================================== */}
+
+      {responseData?.sql && (
+        <details
+          style={{
+            marginTop: "10px",
+          }}
+        >
+          <summary
+            style={{
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            🗄️ View Generated SQL
+          </summary>
+
+          <pre
+            style={{
+              marginTop: "10px",
+              background: "#0f172a",
+              padding: "12px",
+              borderRadius: "8px",
+              overflowX: "auto",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            <code>
+              {responseData.sql}
+            </code>
+          </pre>
+        </details>
       )}
 
     </div>

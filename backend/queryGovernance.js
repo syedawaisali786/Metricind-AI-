@@ -10,6 +10,7 @@ const MAX_QUESTION_LENGTH = 200;
 
 const ALLOWED_INTENTS = [
   "profit_root_cause",
+  "margin_root_cause",
   "q3_revenue",
   "monthly_analysis",
   "country_analysis",

@@ -692,26 +692,36 @@ function productAnalytics(
 
 // ============================================================
 // REGION → PRODUCT DRILL-DOWN
+// RESPECTS ALL ACTIVE FILTERS
 // ============================================================
 
 function productAnalyticsByRegion(
-  region
+  region,
+  additionalFilters = {}
 ) {
+
   if (!region) {
     return [];
   }
 
   // ----------------------------------------------------------
-  // FILTER BY REGION
+  // STEP 1: COMBINE REGION WITH ACTIVE FILTERS
+  // ----------------------------------------------------------
+
+  const filters = {
+    ...additionalFilters,
+    region
+  };
+
+  // ----------------------------------------------------------
+  // STEP 2: FILTER BUSINESS DATA
   // ----------------------------------------------------------
 
   const regionRows =
-    filterData({
-      region
-    });
+    filterData(filters);
 
   // ----------------------------------------------------------
-  // GROUP BY PRODUCT
+  // STEP 3: GROUP BY PRODUCT
   // ----------------------------------------------------------
 
   const groups =
@@ -721,13 +731,12 @@ function productAnalyticsByRegion(
     );
 
   // ----------------------------------------------------------
-  // CALCULATE METRICS
+  // STEP 4: CALCULATE GOVERNED METRICS
   // ----------------------------------------------------------
 
-  return Object.entries(
-    groups
-  ).map(
+  return Object.entries(groups).map(
     ([product, rows]) => ({
+
       region,
 
       product,
