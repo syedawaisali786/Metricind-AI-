@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 
 type RecommendationsProps = {
   country: string;
@@ -15,7 +16,69 @@ type RecommendationData = {
   margin: number;
 };
 
+type Recommendation = {
+  type: "positive" | "warning" | "info";
+  title: string;
+  message: string;
+};
+
 const API_URL = "http://localhost:5000";
+
+/* ============================================================
+   COLORS
+============================================================ */
+
+const COLORS = {
+  bg: "#050807",
+  panel: "#080D0B",
+  panelLight: "#0B1210",
+
+  emerald: "#00E6A8",
+  emeraldBright: "#00F5B5",
+
+  emeraldSoft: "rgba(0,230,168,0.055)",
+  emeraldBorder: "rgba(0,230,168,0.18)",
+
+  white: "#F5F7F6",
+  text: "#D9E1DE",
+  muted: "#7A8581",
+  darkMuted: "#4F5A56",
+
+  red: "#EF4444",
+  redSoft: "rgba(239,68,68,0.06)",
+  redBorder: "rgba(239,68,68,0.20)",
+
+  amber: "#F59E0B",
+  amberSoft: "rgba(245,158,11,0.06)",
+  amberBorder: "rgba(245,158,11,0.20)",
+
+  blue: "#60A5FA",
+  blueSoft: "rgba(96,165,250,0.05)",
+  blueBorder: "rgba(96,165,250,0.18)",
+};
+
+/* ============================================================
+   MONTHS
+============================================================ */
+
+const MONTHS: Record<string, string> = {
+  "1": "January",
+  "2": "February",
+  "3": "March",
+  "4": "April",
+  "5": "May",
+  "6": "June",
+  "7": "July",
+  "8": "August",
+  "9": "September",
+  "10": "October",
+  "11": "November",
+  "12": "December",
+};
+
+/* ============================================================
+   MAIN COMPONENT
+============================================================ */
 
 function Recommendations({
   country,
@@ -32,65 +95,70 @@ function Recommendations({
   const [error, setError] =
     useState("");
 
+  /* ============================================================
+     LOAD DATA
+  ============================================================ */
+
   useEffect(() => {
-    const loadRecommendations =
-      async () => {
-        try {
-          setLoading(true);
-          setError("");
+    const loadRecommendations = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-          const params =
-            new URLSearchParams();
+        const params = new URLSearchParams();
 
-          if (country) {
-            params.set("country", country);
-          }
-
-          if (region) {
-            params.set("region", region);
-          }
-
-          if (product) {
-            params.set("product", product);
-          }
-
-          if (month) {
-            params.set("month", month);
-          }
-
-          const query =
-            params.toString();
-
-          const url =
-            `${API_URL}/api/analytics/filtered` +
-            (query ? `?${query}` : "");
-
-          const response =
-            await fetch(url);
-
-          if (!response.ok) {
-            throw new Error(
-              "Unable to load recommendations"
-            );
-          }
-
-          const result =
-            await response.json();
-
-          setData(result.data);
-        } catch (err) {
-          console.error(
-            "Recommendations Error:",
-            err
-          );
-
-          setError(
-            "Unable to generate recommendations."
-          );
-        } finally {
-          setLoading(false);
+        if (country) {
+          params.set("country", country);
         }
-      };
+
+        if (region) {
+          params.set("region", region);
+        }
+
+        if (product) {
+          params.set("product", product);
+        }
+
+        if (month) {
+          params.set("month", month);
+        }
+
+        const query = params.toString();
+
+        const url =
+          `${API_URL}/api/analytics/filtered` +
+          (query ? `?${query}` : "");
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(
+            "Unable to load recommendations"
+          );
+        }
+
+        const result = await response.json();
+
+        if (!result?.data) {
+          throw new Error(
+            "Invalid recommendation data"
+          );
+        }
+
+        setData(result.data);
+      } catch (err) {
+        console.error(
+          "Recommendations Error:",
+          err
+        );
+
+        setError(
+          "Unable to generate recommendations."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
     loadRecommendations();
   }, [
@@ -100,96 +168,142 @@ function Recommendations({
     month,
   ]);
 
-  // ============================================================
-  // LOADING
-  // ============================================================
+  /* ============================================================
+     FORMATTERS
+  ============================================================ */
+
+  const currency = (value: number): string => {
+    return `₹${Number(
+      value || 0
+    ).toLocaleString("en-IN")}`;
+  };
+
+  const percentage = (value: number): string => {
+    return `${Number(
+      value || 0
+    ).toFixed(2)}%`;
+  };
+
+  /* ============================================================
+     LOADING STATE
+  ============================================================ */
 
   if (loading) {
     return (
-      <div
-        style={{
-          background: "#ffffff",
-          padding: "22px",
-          borderRadius: "12px",
-          marginBottom: "20px",
-          boxShadow:
-            "0 2px 8px rgba(0,0,0,0.08)",
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            color: "#111827",
-          }}
-        >
-          🎯 AI Recommendations
-        </h2>
+      <div style={styles.container}>
 
-        <p
-          style={{
-            color: "#6b7280",
-          }}
-        >
-          Analyzing business performance...
-        </p>
+        <div style={styles.header}>
+
+          <div>
+            <div style={styles.eyebrow}>
+              DECISION SUPPORT
+            </div>
+
+            <h2 style={styles.title}>
+              AI Recommendations
+            </h2>
+
+            <p style={styles.subtitle}>
+              Intelligent recommendations based on
+              business performance
+            </p>
+          </div>
+
+          <div style={styles.statusBadge}>
+            <span style={styles.statusDot} />
+            AI Analysis
+          </div>
+
+        </div>
+
+        <div style={styles.loadingPanel}>
+
+          <div style={styles.spinner} />
+
+          <div>
+            <div style={styles.loadingTitle}>
+              Analyzing performance
+            </div>
+
+            <div style={styles.loadingText}>
+              Generating recommendations...
+            </div>
+          </div>
+
+        </div>
+
       </div>
     );
   }
 
-  // ============================================================
-  // ERROR
-  // ============================================================
+  /* ============================================================
+     ERROR STATE
+  ============================================================ */
 
   if (error || !data) {
     return (
-      <div
-        style={{
-          background: "#ffffff",
-          padding: "22px",
-          borderRadius: "12px",
-          marginBottom: "20px",
-          boxShadow:
-            "0 2px 8px rgba(0,0,0,0.08)",
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            color: "#111827",
-          }}
-        >
-          🎯 AI Recommendations
-        </h2>
+      <div style={styles.container}>
 
-        <p
-          style={{
-            color: "#ef4444",
-          }}
-        >
-          {error ||
-            "No recommendation data available."}
-        </p>
+        <div style={styles.header}>
+
+          <div>
+            <div style={styles.eyebrow}>
+              DECISION SUPPORT
+            </div>
+
+            <h2 style={styles.title}>
+              AI Recommendations
+            </h2>
+
+            <p style={styles.subtitle}>
+              Intelligent recommendations based on
+              business performance
+            </p>
+          </div>
+
+          <div style={styles.statusBadge}>
+            <span
+              style={{
+                ...styles.statusDot,
+                backgroundColor: COLORS.red,
+                boxShadow:
+                  "0 0 9px rgba(239,68,68,0.55)",
+              }}
+            />
+
+            Offline
+          </div>
+
+        </div>
+
+        <div style={styles.errorPanel}>
+
+          <div style={styles.errorIcon}>
+            !
+          </div>
+
+          <div>
+
+            <div style={styles.errorTitle}>
+              Unable to generate recommendations
+            </div>
+
+            <div style={styles.errorText}>
+              {error ||
+                "No recommendation data available."}
+            </div>
+
+          </div>
+
+        </div>
+
       </div>
     );
   }
 
-  // ============================================================
-  // FORMATTERS
-  // ============================================================
-
-  const currency = (
-    value: number
-  ) =>
-    `₹${Number(
-      value || 0
-    ).toLocaleString("en-IN")}`;
-
-  const margin =
-    Number(data.margin || 0);
-
-  // ============================================================
-  // FILTER SCOPE
-  // ============================================================
+  /* ============================================================
+     FILTER SCOPE
+  ============================================================ */
 
   const filterParts: string[] = [];
 
@@ -206,19 +320,8 @@ function Recommendations({
   }
 
   if (month) {
-    const months = [
-      "",
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-    ];
-
     filterParts.push(
-      months[Number(month)] ||
-        month
+      MONTHS[month] || month
     );
   }
 
@@ -227,19 +330,16 @@ function Recommendations({
       ? filterParts.join(" • ")
       : "All business data";
 
-  // ============================================================
-  // GENERATE RECOMMENDATIONS
-  // ============================================================
+  /* ============================================================
+     RECOMMENDATION LOGIC
+  ============================================================ */
 
-  const recommendations: {
-    type: "positive" | "warning" | "info";
-    title: string;
-    message: string;
-  }[] = [];
+  const margin =
+    Number(data.margin || 0);
 
-  // ------------------------------------------------------------
-  // NO DATA
-  // ------------------------------------------------------------
+  const recommendations: Recommendation[] = [];
+
+  /* NO DATA */
 
   if (
     data.revenue === 0 &&
@@ -247,15 +347,15 @@ function Recommendations({
   ) {
     recommendations.push({
       type: "warning",
+
       title: "No Data Available",
+
       message:
         "No business records match the selected filters. Try another country, region, product, or month.",
     });
   }
 
-  // ------------------------------------------------------------
-  // LOSS
-  // ------------------------------------------------------------
+  /* LOSS */
 
   if (
     data.revenue > 0 &&
@@ -263,7 +363,9 @@ function Recommendations({
   ) {
     recommendations.push({
       type: "warning",
+
       title: "Review Profitability",
+
       message:
         `The selected segment is generating a loss of ${currency(
           Math.abs(data.profit)
@@ -271,9 +373,7 @@ function Recommendations({
     });
   }
 
-  // ------------------------------------------------------------
-  // LOW MARGIN
-  // ------------------------------------------------------------
+  /* LOW MARGIN */
 
   if (
     data.revenue > 0 &&
@@ -282,17 +382,17 @@ function Recommendations({
   ) {
     recommendations.push({
       type: "warning",
+
       title: "Improve Margin",
+
       message:
-        `Profit margin is only ${margin.toFixed(
-          2
-        )}%. Consider reviewing costs or pricing to improve profitability.`,
+        `Profit margin is ${percentage(
+          margin
+        )}. Consider reviewing costs or pricing to improve profitability.`,
     });
   }
 
-  // ------------------------------------------------------------
-  // STRONG MARGIN
-  // ------------------------------------------------------------
+  /* STRONG MARGIN */
 
   if (
     data.revenue > 0 &&
@@ -300,17 +400,17 @@ function Recommendations({
   ) {
     recommendations.push({
       type: "positive",
+
       title: "Strong Profitability",
+
       message:
-        `This segment has a strong ${margin.toFixed(
-          2
-        )}% profit margin. Consider maintaining the current business strategy.`,
+        `This segment has a strong ${percentage(
+          margin
+        )} profit margin. Consider maintaining the current strategy.`,
     });
   }
 
-  // ------------------------------------------------------------
-  // PROFITABLE BUSINESS
-  // ------------------------------------------------------------
+  /* HEALTHY PERFORMANCE */
 
   if (
     data.revenue > 0 &&
@@ -320,17 +420,17 @@ function Recommendations({
   ) {
     recommendations.push({
       type: "positive",
+
       title: "Healthy Performance",
+
       message:
-        `The segment is profitable with a ${margin.toFixed(
-          2
-        )}% margin. Continue monitoring cost efficiency.`,
+        `The segment is profitable with a ${percentage(
+          margin
+        )} margin. Continue monitoring cost efficiency.`,
     });
   }
 
-  // ------------------------------------------------------------
-  // COST RATIO
-  // ------------------------------------------------------------
+  /* HIGH COST */
 
   if (
     data.revenue > 0 &&
@@ -338,15 +438,15 @@ function Recommendations({
   ) {
     recommendations.push({
       type: "warning",
+
       title: "High Cost Ratio",
+
       message:
-        "Costs represent more than 70% of revenue. Cost optimization could significantly improve profitability.",
+        "Costs represent more than 70% of revenue. Cost optimization could improve profitability.",
     });
   }
 
-  // ------------------------------------------------------------
-  // ORDERS
-  // ------------------------------------------------------------
+  /* LOW ORDER VOLUME */
 
   if (
     data.revenue > 0 &&
@@ -354,15 +454,15 @@ function Recommendations({
   ) {
     recommendations.push({
       type: "info",
+
       title: "Limited Order Volume",
+
       message:
-        "Only one order is represented in the selected data scope. More transaction data would provide stronger trend analysis.",
+        "Only one order is represented in the selected scope. More transaction data would provide stronger trend analysis.",
     });
   }
 
-  // ------------------------------------------------------------
-  // GENERAL POSITIVE
-  // ------------------------------------------------------------
+  /* GENERAL */
 
   if (
     recommendations.length === 0 &&
@@ -370,231 +470,799 @@ function Recommendations({
   ) {
     recommendations.push({
       type: "positive",
+
       title: "Business Performing Well",
+
       message:
         "The selected segment is profitable and does not currently show a major warning condition.",
     });
   }
 
-  // ============================================================
-  // CARD STYLES
-  // ============================================================
+  /* ============================================================
+     RECOMMENDATION STYLE
+  ============================================================ */
 
-  const getCardStyle = (
+  const getRecommendationStyle = (
     type: "positive" | "warning" | "info"
   ) => {
     if (type === "warning") {
       return {
-        background: "#fff7ed",
-        border: "1px solid #fed7aa",
-        icon: "⚠️",
-        titleColor: "#c2410c",
+        icon: "!",
+        color: COLORS.amber,
+        background: COLORS.amberSoft,
+        border: COLORS.amberBorder,
       };
     }
 
     if (type === "positive") {
       return {
-        background: "#f0fdf4",
-        border: "1px solid #bbf7d0",
-        icon: "✅",
-        titleColor: "#15803d",
+        icon: "✓",
+        color: COLORS.emerald,
+        background: COLORS.emeraldSoft,
+        border: COLORS.emeraldBorder,
       };
     }
 
     return {
-      background: "#eff6ff",
-      border: "1px solid #bfdbfe",
-      icon: "ℹ️",
-      titleColor: "#1d4ed8",
+      icon: "i",
+      color: COLORS.blue,
+      background: COLORS.blueSoft,
+      border: COLORS.blueBorder,
     };
   };
 
-  // ============================================================
-  // UI
-  // ============================================================
+  /* ============================================================
+     MAIN UI
+  ============================================================ */
 
   return (
-    <div
-      style={{
-        background: "#ffffff",
-        padding: "22px",
-        borderRadius: "12px",
-        marginBottom: "20px",
-        boxShadow:
-          "0 2px 8px rgba(0,0,0,0.08)",
-      }}
-    >
+    <div style={styles.container}>
+
       {/* HEADER */}
 
-      <div
-        style={{
-          marginBottom: "18px",
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            color: "#111827",
-            fontSize: "22px",
-          }}
-        >
-          🎯 AI Recommendations
-        </h2>
+      <div style={styles.header}>
 
-        <p
-          style={{
-            margin:
-              "6px 0 0",
-            color: "#6b7280",
-            fontSize: "14px",
-          }}
-        >
-          Deterministic recommendations based on governed business metrics
+        <div>
+
+          <div style={styles.eyebrow}>
+            DECISION SUPPORT
+          </div>
+
+          <h2 style={styles.title}>
+            AI Recommendations
+          </h2>
+
+          <p style={styles.subtitle}>
+            Intelligent recommendations based on
+            business performance
+          </p>
+
+        </div>
+
+        <div style={styles.statusBadge}>
+          <span style={styles.statusDot} />
+          AI Analysis
+        </div>
+
+      </div>
+
+
+      {/* MAIN AI PANEL */}
+
+      <div style={styles.aiPanel}>
+
+        <div style={styles.topGlow} />
+
+        {/* ICON */}
+
+        <div style={styles.aiIcon}>
+          ✦
+        </div>
+
+
+        {/* TITLE */}
+
+        <h3 style={styles.aiTitle}>
+          Decision Recommendation
+        </h3>
+
+        <p style={styles.aiSubtitle}>
+          Recommendations generated from
+          current business performance
         </p>
 
-        <div
-          style={{
-            display: "inline-block",
-            marginTop: "10px",
-            background: "#f5f3ff",
-            color: "#6d28d9",
-            padding: "6px 10px",
-            borderRadius: "20px",
-            fontSize: "13px",
-            fontWeight: "bold",
-          }}
-        >
-          Scope: {scope}
+
+        {/* SCOPE */}
+
+        <div style={styles.scope}>
+
+          <span style={styles.scopeLabel}>
+            SCOPE
+          </span>
+
+          <span style={styles.scopeValue}>
+            {scope}
+          </span>
+
         </div>
-      </div>
 
-      {/* RECOMMENDATIONS */}
 
-      <div
-        style={{
-          display: "grid",
-          gap: "12px",
-        }}
-      >
-        {recommendations.map(
-          (recommendation, index) => {
-            const style =
-              getCardStyle(
-                recommendation.type
-              );
+        {/* RECOMMENDATIONS */}
 
-            return (
-              <div
-                key={index}
-                style={{
-                  background:
-                    style.background,
-                  border:
-                    style.border,
-                  padding: "16px",
-                  borderRadius: "10px",
-                }}
-              >
+        <div style={styles.recommendationList}>
+
+          {recommendations.map(
+            (recommendation, index) => {
+
+              const recStyle =
+                getRecommendationStyle(
+                  recommendation.type
+                );
+
+              return (
                 <div
+                  key={index}
                   style={{
-                    display: "flex",
-                    alignItems:
-                      "center",
-                    gap: "8px",
-                    marginBottom:
-                      "6px",
+                    ...styles.recommendation,
+                    background:
+                      recStyle.background,
+                    borderColor:
+                      recStyle.border,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: "18px",
-                    }}
-                  >
-                    {style.icon}
-                  </span>
 
-                  <strong
+                  {/* ICON */}
+
+                  <div
                     style={{
+                      ...styles.recommendationIcon,
                       color:
-                        style.titleColor,
-                      fontSize:
-                        "15px",
+                        recStyle.color,
+                      background:
+                        recStyle.background,
+                      borderColor:
+                        recStyle.border,
                     }}
                   >
-                    {
-                      recommendation.title
+                    {recStyle.icon}
+                  </div>
+
+
+                  {/* CONTENT */}
+
+                  <div
+                    style={
+                      styles.recommendationContent
                     }
-                  </strong>
-                </div>
+                  >
 
-                <div
-                  style={{
-                    color: "#374151",
-                    lineHeight: "1.6",
-                    fontSize: "14px",
-                  }}
-                >
-                  {
-                    recommendation.message
-                  }
+                    <div
+                      style={{
+                        ...styles.recommendationTitle,
+                        color:
+                          recStyle.color,
+                      }}
+                    >
+                      {recommendation.title}
+                    </div>
+
+                    <div
+                      style={
+                        styles.recommendationMessage
+                      }
+                    >
+                      {recommendation.message}
+                    </div>
+
+                  </div>
+
                 </div>
-              </div>
-            );
-          }
-        )}
+              );
+            }
+          )}
+
+        </div>
+
+
+        {/* GOVERNANCE */}
+
+        <div style={styles.governance}>
+
+          <span style={styles.governanceBadge}>
+            ✓ Governed Metrics
+          </span>
+
+          <span style={styles.governanceBadge}>
+            ✓ Deterministic
+          </span>
+
+          <span style={styles.governanceBadge}>
+            ✓ Semantic Layer
+          </span>
+
+        </div>
+
       </div>
 
-      {/* GOVERNANCE */}
-
-      <div
-        style={{
-          marginTop: "15px",
-          display: "flex",
-          gap: "10px",
-          flexWrap: "wrap",
-        }}
-      >
-        <span
-          style={{
-            background: "#ecfdf5",
-            color: "#047857",
-            padding: "7px 12px",
-            borderRadius: "20px",
-            fontSize: "12px",
-            fontWeight: "bold",
-          }}
-        >
-          ✓ Governed Metrics
-        </span>
-
-        <span
-          style={{
-            background: "#eff6ff",
-            color: "#1d4ed8",
-            padding: "7px 12px",
-            borderRadius: "20px",
-            fontSize: "12px",
-            fontWeight: "bold",
-          }}
-        >
-          ✓ Deterministic
-        </span>
-
-        <span
-          style={{
-            background: "#f5f3ff",
-            color: "#6d28d9",
-            padding: "7px 12px",
-            borderRadius: "20px",
-            fontSize: "12px",
-            fontWeight: "bold",
-          }}
-        >
-          ✓ Semantic Layer
-        </span>
-      </div>
     </div>
   );
 }
+
+
+/* ============================================================
+   STYLES
+============================================================ */
+
+const styles: Record<
+  string,
+  CSSProperties
+> = {
+
+  /* ==========================================================
+     CONTAINER
+  ========================================================== */
+
+  container: {
+    position: "relative",
+
+    overflow: "hidden",
+
+    background:
+      "radial-gradient(circle at 90% 0%, rgba(0,230,168,0.07), transparent 28%), linear-gradient(145deg, #080D0B 0%, #050807 55%, #030504 100%)",
+
+    padding: "28px",
+
+    borderRadius: "20px",
+
+    marginBottom: "24px",
+
+    border:
+      "1px solid rgba(0,230,168,0.13)",
+
+    boxShadow:
+      "0 22px 60px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.025)",
+
+    color: COLORS.white,
+  },
+
+
+  /* ==========================================================
+     HEADER
+  ========================================================== */
+
+  header: {
+    display: "flex",
+
+    justifyContent:
+      "space-between",
+
+    alignItems:
+      "flex-start",
+
+    gap: "20px",
+
+    marginBottom: "22px",
+  },
+
+
+  eyebrow: {
+    fontSize: "9px",
+
+    fontWeight: 800,
+
+    letterSpacing: "2px",
+
+    color: COLORS.emerald,
+
+    marginBottom: "8px",
+  },
+
+
+  title: {
+    margin: 0,
+
+    fontSize: "28px",
+
+    fontWeight: 800,
+
+    letterSpacing: "-0.04em",
+
+    color: COLORS.white,
+  },
+
+
+  subtitle: {
+    margin: "7px 0 0",
+
+    color: COLORS.muted,
+
+    fontSize: "12px",
+
+    lineHeight: 1.5,
+  },
+
+
+  /* ==========================================================
+     STATUS
+  ========================================================== */
+
+  statusBadge: {
+    display: "flex",
+
+    alignItems: "center",
+
+    gap: "8px",
+
+    padding: "8px 13px",
+
+    borderRadius: "999px",
+
+    background:
+      "rgba(0,230,168,0.045)",
+
+    border:
+      "1px solid rgba(0,230,168,0.15)",
+
+    color: COLORS.emerald,
+
+    fontSize: "10px",
+
+    fontWeight: 700,
+
+    whiteSpace: "nowrap",
+
+    boxShadow:
+      "0 0 18px rgba(0,230,168,0.035)",
+  },
+
+
+  statusDot: {
+    width: "7px",
+
+    height: "7px",
+
+    borderRadius: "50%",
+
+    backgroundColor:
+      COLORS.emerald,
+
+    display: "inline-block",
+
+    boxShadow:
+      "0 0 9px rgba(0,230,168,0.65)",
+  },
+
+
+  /* ==========================================================
+     LOADING
+  ========================================================== */
+
+  loadingPanel: {
+    display: "flex",
+
+    alignItems: "center",
+
+    justifyContent: "center",
+
+    gap: "14px",
+
+    minHeight: "130px",
+
+    padding: "24px",
+
+    borderRadius: "16px",
+
+    background:
+      "linear-gradient(145deg, #0B1410, #050907)",
+
+    border:
+      "1px solid rgba(0,230,168,0.14)",
+  },
+
+
+  spinner: {
+    width: "24px",
+
+    height: "24px",
+
+    borderRadius: "50%",
+
+    border:
+      "3px solid rgba(0,230,168,0.15)",
+
+    borderTop:
+      "3px solid #00E6A8",
+  },
+
+
+  loadingTitle: {
+    color: COLORS.white,
+
+    fontSize: "14px",
+
+    fontWeight: 700,
+
+    marginBottom: "5px",
+  },
+
+
+  loadingText: {
+    color: COLORS.muted,
+
+    fontSize: "11px",
+  },
+
+
+  /* ==========================================================
+     ERROR
+  ========================================================== */
+
+  errorPanel: {
+    display: "flex",
+
+    alignItems: "center",
+
+    gap: "14px",
+
+    padding: "20px",
+
+    borderRadius: "14px",
+
+    background:
+      COLORS.redSoft,
+
+    border:
+      `1px solid ${COLORS.redBorder}`,
+  },
+
+
+  errorIcon: {
+    width: "36px",
+
+    height: "36px",
+
+    flexShrink: 0,
+
+    display: "flex",
+
+    alignItems: "center",
+
+    justifyContent: "center",
+
+    borderRadius: "10px",
+
+    color: COLORS.red,
+
+    border:
+      `1px solid ${COLORS.redBorder}`,
+
+    background:
+      "rgba(239,68,68,0.08)",
+
+    fontWeight: 800,
+  },
+
+
+  errorTitle: {
+    color: COLORS.red,
+
+    fontSize: "13px",
+
+    fontWeight: 700,
+
+    marginBottom: "4px",
+  },
+
+
+  errorText: {
+    color: COLORS.muted,
+
+    fontSize: "11px",
+
+    lineHeight: 1.5,
+  },
+
+
+  /* ==========================================================
+     AI PANEL
+  ========================================================== */
+
+  aiPanel: {
+    position: "relative",
+
+    overflow: "hidden",
+
+    padding: "28px",
+
+    borderRadius: "17px",
+
+    background:
+      "linear-gradient(145deg, #0B1410 0%, #07100D 50%, #050907 100%)",
+
+    border:
+      "1px solid rgba(0,230,168,0.20)",
+
+    boxShadow:
+      "0 18px 55px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.025)",
+
+    textAlign: "center",
+  },
+
+
+  topGlow: {
+    position: "absolute",
+
+    top: 0,
+
+    left: "15%",
+
+    right: "15%",
+
+    height: "1px",
+
+    background:
+      "linear-gradient(90deg, transparent, #00E6A8, transparent)",
+
+    boxShadow:
+      "0 0 20px rgba(0,230,168,0.55)",
+  },
+
+
+  /* ==========================================================
+     AI ICON
+  ========================================================== */
+
+  aiIcon: {
+    width: "43px",
+
+    height: "43px",
+
+    margin: "0 auto 12px",
+
+    display: "flex",
+
+    alignItems: "center",
+
+    justifyContent: "center",
+
+    borderRadius: "12px",
+
+    color: COLORS.emerald,
+
+    background:
+      "rgba(0,230,168,0.07)",
+
+    border:
+      "1px solid rgba(0,230,168,0.17)",
+
+    fontSize: "21px",
+
+    boxShadow:
+      "0 0 25px rgba(0,230,168,0.07)",
+  },
+
+
+  /* ==========================================================
+     AI TITLE
+  ========================================================== */
+
+  aiTitle: {
+    margin: 0,
+
+    color: COLORS.white,
+
+    fontSize: "20px",
+
+    fontWeight: 800,
+
+    letterSpacing: "-0.025em",
+  },
+
+
+  /* ==========================================================
+     AI SUBTITLE
+  ========================================================== */
+
+  aiSubtitle: {
+    margin: "7px auto 0",
+
+    maxWidth: "600px",
+
+    color: COLORS.muted,
+
+    fontSize: "11px",
+
+    lineHeight: 1.5,
+  },
+
+
+  /* ==========================================================
+     SCOPE
+  ========================================================== */
+
+  scope: {
+    display: "inline-flex",
+
+    alignItems: "center",
+
+    gap: "8px",
+
+    marginTop: "16px",
+
+    padding: "7px 12px",
+
+    borderRadius: "999px",
+
+    background:
+      "rgba(0,230,168,0.045)",
+
+    border:
+      "1px solid rgba(0,230,168,0.12)",
+  },
+
+
+  scopeLabel: {
+    color: COLORS.darkMuted,
+
+    fontSize: "8px",
+
+    fontWeight: 800,
+
+    letterSpacing: "1.2px",
+  },
+
+
+  scopeValue: {
+    color: COLORS.emerald,
+
+    fontSize: "10px",
+
+    fontWeight: 700,
+  },
+
+
+  /* ==========================================================
+     RECOMMENDATION LIST
+  ========================================================== */
+
+  recommendationList: {
+    display: "flex",
+
+    flexDirection: "column",
+
+    gap: "10px",
+
+    marginTop: "22px",
+
+    textAlign: "left",
+  },
+
+
+  /* ==========================================================
+     RECOMMENDATION
+  ========================================================== */
+
+  recommendation: {
+    display: "flex",
+
+    alignItems: "flex-start",
+
+    gap: "13px",
+
+    padding: "16px",
+
+    borderRadius: "12px",
+
+    border:
+      "1px solid transparent",
+
+    transition:
+      "transform 0.2s ease",
+  },
+
+
+  /* ==========================================================
+     RECOMMENDATION ICON
+  ========================================================== */
+
+  recommendationIcon: {
+    width: "34px",
+
+    height: "34px",
+
+    flexShrink: 0,
+
+    display: "flex",
+
+    alignItems: "center",
+
+    justifyContent: "center",
+
+    borderRadius: "9px",
+
+    border:
+      "1px solid transparent",
+
+    fontSize: "14px",
+
+    fontWeight: 800,
+  },
+
+
+  /* ==========================================================
+     CONTENT
+  ========================================================== */
+
+  recommendationContent: {
+    minWidth: 0,
+
+    flex: 1,
+  },
+
+
+  recommendationTitle: {
+    fontSize: "13px",
+
+    fontWeight: 800,
+
+    marginBottom: "5px",
+  },
+
+
+  recommendationMessage: {
+    color: COLORS.text,
+
+    fontSize: "11px",
+
+    lineHeight: 1.65,
+  },
+
+
+  /* ==========================================================
+     GOVERNANCE
+  ========================================================== */
+
+  governance: {
+    display: "flex",
+
+    alignItems: "center",
+
+    justifyContent: "center",
+
+    flexWrap: "wrap",
+
+    gap: "8px",
+
+    marginTop: "20px",
+
+    paddingTop: "16px",
+
+    borderTop:
+      "1px solid rgba(255,255,255,0.055)",
+  },
+
+
+  governanceBadge: {
+    display: "inline-flex",
+
+    alignItems: "center",
+
+    padding: "6px 10px",
+
+    borderRadius: "999px",
+
+    background:
+      "rgba(0,230,168,0.035)",
+
+    border:
+      "1px solid rgba(0,230,168,0.10)",
+
+    color: COLORS.muted,
+
+    fontSize: "9px",
+
+    fontWeight: 700,
+  },
+};
 
 export default Recommendations;

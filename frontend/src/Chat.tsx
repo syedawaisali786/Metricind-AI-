@@ -10,6 +10,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 
 const API_URL = "http://localhost:5000";
@@ -37,20 +38,15 @@ type DrillDown = {
 
   shippingCost?: number | null;
   materialCost?: number | null;
-  
 };
 
 type QueryResponse = {
   question?: string;
-
   interpretation?: string;
-
   agentSteps?: string[];
 
   metric?: string;
-
   value?: number;
-
   message?: string;
 
   data?: Record<string, unknown>[];
@@ -58,7 +54,6 @@ type QueryResponse = {
   chartType?: "line" | "bar" | "card";
 
   apiCall?: string;
-
   sql?: string;
 
   filters?: Record<string, unknown>;
@@ -81,10 +76,8 @@ type QueryResponse = {
 
 function Chat() {
   const [question, setQuestion] = useState("");
-
   const [responseData, setResponseData] =
     useState<QueryResponse | null>(null);
-
   const [loading, setLoading] = useState(false);
 
   // ==========================================================
@@ -92,26 +85,23 @@ function Chat() {
   // ==========================================================
 
   const askQuestion = async () => {
-    if (!question.trim()) return;
+    if (!question.trim() || loading) return;
 
     setLoading(true);
     setResponseData(null);
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/query`,
-        {
-          method: "POST",
+      const response = await fetch(`${API_URL}/api/query`, {
+        method: "POST",
 
-          headers: {
-            "Content-Type": "application/json",
-          },
+        headers: {
+          "Content-Type": "application/json",
+        },
 
-          body: JSON.stringify({
-            question: question.trim(),
-          }),
-        }
-      );
+        body: JSON.stringify({
+          question: question.trim(),
+        }),
+      });
 
       if (!response.ok) {
         throw new Error(
@@ -121,96 +111,113 @@ function Chat() {
 
       const data: QueryResponse =
         await response.json();
-        console.log("FULL API RESPONSE:", data);
-console.log("DRILL DOWN:", data?.drillDown);
-console.log("SHIPPING:", data?.drillDown?.shippingCost);
-console.log("MATERIAL:", data?.drillDown?.materialCost);
+
+      console.log("FULL API RESPONSE:", data);
+      console.log("CHART TYPE:", data.chartType);
+      console.log("CHART DATA:", data.data);
+      console.log("DRILL DOWN:", data.drillDown);
 
       setResponseData(data);
-
     } catch (error) {
-      console.error(error);
+      console.error("MetricMind error:", error);
 
       setResponseData({
-        interpretation:
-          "Backend Connection Error",
+        interpretation: "Backend Connection Error",
 
         message:
           "Unable to connect to MetricMind backend. Make sure the backend is running on port 5000.",
 
         governance: {
           allowed: false,
-          reason:
-            "Backend connection failed.",
+          reason: "Backend connection failed.",
         },
       });
-
     } finally {
       setLoading(false);
     }
   };
 
-  // ============================================================
+  // ==========================================================
   // CHART DATA
-  // ============================================================
+  // ==========================================================
 
-  const chartData =
-    responseData?.data || [];
+  const chartData: Record<string, unknown>[] =
+    Array.isArray(responseData?.data)
+      ? responseData.data
+      : [];
 
-  // ============================================================
+  // ==========================================================
   // FIND X AXIS
-  // ============================================================
+  // ==========================================================
 
   const getXAxisKey = () => {
     if (!chartData.length) return "";
 
-    if ("month" in chartData[0]) {
-      return "month";
-    }
+    const firstRow = chartData[0];
 
-    if ("product" in chartData[0]) {
-      return "product";
-    }
+    if ("month" in firstRow) return "month";
+    if ("product" in firstRow) return "product";
+    if ("country" in firstRow) return "country";
+    if ("region" in firstRow) return "region";
 
-    if ("country" in chartData[0]) {
-      return "country";
-    }
+    const possibleKeys = Object.keys(firstRow);
 
-    if ("region" in chartData[0]) {
-      return "region";
-    }
-
-    return Object.keys(chartData[0])[0];
+    return possibleKeys.length > 0
+      ? possibleKeys[0]
+      : "";
   };
 
   const xAxisKey = getXAxisKey();
 
-  // ============================================================
+  // ==========================================================
   // CHECK CHART FIELDS
-  // ============================================================
+  // ==========================================================
 
   const hasRevenue =
     chartData.length > 0 &&
-    "revenue" in chartData[0];
+    chartData.some(
+      (item) =>
+        typeof item.revenue === "number"
+    );
 
   const hasCost =
     chartData.length > 0 &&
-    "cost" in chartData[0];
+    chartData.some(
+      (item) =>
+        typeof item.cost === "number"
+    );
 
   const hasProfit =
     chartData.length > 0 &&
-    "profit" in chartData[0];
+    chartData.some(
+      (item) =>
+        typeof item.profit === "number"
+    );
+    const hasShippingCost =
+  chartData.length > 0 &&
+  chartData.some(
+    (item) =>
+      typeof item.shippingCost === "number"
+  );
 
-  // ============================================================
+const hasMaterialCost =
+  chartData.length > 0 &&
+  chartData.some(
+    (item) =>
+      typeof item.materialCost === "number"
+  );
+
+  // ==========================================================
   // FORMAT CURRENCY
-  // ============================================================
+  // ==========================================================
 
   const formatCurrency = (
     value: number | null | undefined
   ) => {
     if (
       value === null ||
-      value === undefined
+      value === undefined ||
+      Number.isNaN(Number(value))
     ) {
       return "N/A";
     }
@@ -220,15 +227,48 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
     )}`;
   };
 
-  // ============================================================
+  // ==========================================================
+  // SAFE NUMBER FORMATTER
+  // ==========================================================
+
+  const formatChartValue = (
+    value: number
+  ) => {
+    if (Math.abs(value) >= 1000000) {
+      return `${(value / 1000000).toFixed(1)}M`;
+    }
+
+    if (Math.abs(value) >= 1000) {
+      return `${(value / 1000).toFixed(0)}K`;
+    }
+
+    return value.toLocaleString("en-IN");
+  };
+
+  // ==========================================================
+  // CHART KEY
+  // ==========================================================
+
+  const chartKey = [
+    responseData?.chartType ?? "none",
+    xAxisKey,
+    chartData.length,
+    chartData
+      .map((item) =>
+        String(item[xAxisKey] ?? "")
+      )
+      .join("-"),
+  ].join("|");
+
+  // ==========================================================
   // UI
-  // ============================================================
+  // ==========================================================
 
   return (
     <div
       style={{
         background:
-          "linear-gradient(135deg, #0f172a, #1e293b)",
+          "linear-gradient(135deg, #080B0A, #111614)",
         padding: "25px",
         borderRadius: "16px",
         marginTop: "25px",
@@ -237,7 +277,6 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
           "0 10px 30px rgba(0,0,0,0.25)",
       }}
     >
-
       {/* ====================================================== */}
       {/* HEADER */}
       {/* ====================================================== */}
@@ -252,7 +291,7 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
 
       <p
         style={{
-          color: "#cbd5e1",
+          color: "#8F9B96",
         }}
       >
         Ask questions about your business data.
@@ -270,7 +309,10 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
           setQuestion(e.target.value)
         }
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
+          if (
+            e.key === "Enter" &&
+            !loading
+          ) {
             askQuestion();
           }
         }}
@@ -279,12 +321,13 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
           padding: "14px",
           borderRadius: "10px",
           border:
-            "1px solid #475569",
-          background: "#f8fafc",
-          color: "#111827",
+            "1px solid rgba(0,230,168,0.35)",
+          background: "#0B100E",
+          color: "#F5F7F6",
           marginTop: "15px",
           boxSizing: "border-box",
           fontSize: "15px",
+          outline: "none",
         }}
       />
 
@@ -299,9 +342,9 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
           marginTop: "15px",
           padding: "11px 24px",
           background: loading
-            ? "#64748b"
-            : "#2563eb",
-          color: "white",
+            ? "#37423E"
+            : "#00E6A8",
+          color: "#03100B",
           border: "none",
           borderRadius: "9px",
           cursor: loading
@@ -323,12 +366,11 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
         <div
           style={{
             marginTop: "25px",
-            background: "#334155",
+            background: "#0B100E",
             padding: "20px",
             borderRadius: "12px",
           }}
         >
-
           {/* ================================================== */}
           {/* INTERPRETATION */}
           {/* ================================================== */}
@@ -342,7 +384,7 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
               <div
                 style={{
                   fontSize: "13px",
-                  color: "#94a3b8",
+                  color: "#3a5548",
                   marginBottom: "5px",
                 }}
               >
@@ -367,7 +409,7 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
           {responseData.message && (
             <div
               style={{
-                background: "#1e293b",
+                background: "#0B100E",
                 padding: "16px",
                 borderRadius: "10px",
                 marginBottom: "20px",
@@ -400,17 +442,14 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
             <div
               style={{
                 background:
-                  "linear-gradient(135deg, #172554, #1e3a8a)",
+                  "linear-gradient(135deg, #0B1712, #10241B)",
                 padding: "20px",
                 borderRadius: "12px",
                 marginBottom: "20px",
                 border:
-                  "1px solid #3b82f6",
+                  "1px solid rgba(0,230,168,0.30)",
               }}
             >
-
-              {/* ROOT CAUSE TITLE */}
-
               <div
                 style={{
                   fontSize: "18px",
@@ -423,7 +462,7 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
 
               <p
                 style={{
-                  color: "#bfdbfe",
+                  color: "#9BAFA7",
                   marginTop: "5px",
                   marginBottom: "20px",
                 }}
@@ -431,10 +470,6 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
                 MetricMind identified the main
                 contributors to the profit result.
               </p>
-
-              {/* ============================================== */}
-              {/* DRILL-DOWN CARDS */}
-              {/* ============================================== */}
 
               <div
                 style={{
@@ -444,16 +479,13 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
                   gap: "15px",
                 }}
               >
-
-                {/* ========================================== */}
                 {/* HIGHEST COST REGION */}
-                {/* ========================================== */}
 
                 {responseData.drillDown
                   .highestCostRegion && (
                   <div
                     style={{
-                      background: "#0f172a",
+                      background: "#080D0B",
                       padding: "16px",
                       borderRadius: "10px",
                     }}
@@ -495,15 +527,13 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
                   </div>
                 )}
 
-                {/* ========================================== */}
                 {/* LOWEST PROFIT REGION */}
-                {/* ========================================== */}
 
                 {responseData.drillDown
                   .lowestProfitRegion && (
                   <div
                     style={{
-                      background: "#0f172a",
+                      background: "#080D0B",
                       padding: "16px",
                       borderRadius: "10px",
                     }}
@@ -545,15 +575,13 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
                   </div>
                 )}
 
-                {/* ========================================== */}
                 {/* WEAKEST PRODUCT */}
-                {/* ========================================== */}
 
                 {responseData.drillDown
                   .weakestProduct && (
                   <div
                     style={{
-                      background: "#0f172a",
+                      background: "#0D1210",
                       padding: "16px",
                       borderRadius: "10px",
                     }}
@@ -594,104 +622,102 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
                     </div>
                   </div>
                 )}
-
               </div>
 
-              {/* ============================================== */}
-              {/* STEP 4 - COST BREAKDOWN */}
-              {/* ============================================== */}
+              {/* COST BREAKDOWN */}
 
-              {responseData.drillDown && (
-  <div
-    style={{
-      marginTop: "20px",
-      background: "#0f172a",
-      padding: "18px",
-      borderRadius: "10px",
-    }}
-  >
-    <h3
-      style={{
-        color: "#ffffff",
-        marginBottom: "14px",
-      }}
-    >
-      💰 Cost Breakdown
-    </h3>
+              <div
+                style={{
+                  marginTop: "20px",
+                  background: "#0D1210",
+                  padding: "18px",
+                  borderRadius: "10px",
+                }}
+              >
+                <h3
+                  style={{
+                    color: "#ffffff",
+                    marginBottom: "14px",
+                  }}
+                >
+                  💰 Cost Breakdown
+                </h3>
 
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: "14px",
-      }}
-    >
-      {/* SHIPPING COST */}
-      <div
-        style={{
-          background: "#1e293b",
-          padding: "14px",
-          borderRadius: "8px",
-        }}
-      >
-        <div
-          style={{
-            color: "#94a3b8",
-            fontSize: "12px",
-            marginBottom: "6px",
-          }}
-        >
-          SHIPPING COST
-        </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(2, minmax(0, 1fr))",
+                    gap: "14px",
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "#0D1210",
+                      padding: "14px",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: "#94a3b8",
+                        fontSize: "12px",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      SHIPPING COST
+                    </div>
 
-        <strong
-          style={{
-            fontSize: "18px",
-            color: "#f59e0b",
-          }}
-        >
-          {responseData.drillDown.shippingCost != null
-            ? `₹${Number(
-                responseData.drillDown.shippingCost
-              ).toLocaleString("en-IN")}`
-            : "N/A"}
-        </strong>
-      </div>
+                    <strong
+                      style={{
+                        fontSize: "18px",
+                        color: "#f59e0b",
+                      }}
+                    >
+                      {responseData.drillDown
+                        .shippingCost != null
+                        ? formatCurrency(
+                            responseData.drillDown
+                              .shippingCost
+                          )
+                        : "N/A"}
+                    </strong>
+                  </div>
 
-      {/* MATERIAL COST */}
-      <div
-        style={{
-          background: "#1e293b",
-          padding: "14px",
-          borderRadius: "8px",
-        }}
-      >
-        <div
-          style={{
-            color: "#94a3b8",
-            fontSize: "12px",
-            marginBottom: "6px",
-          }}
-        >
-          MATERIAL COST
-        </div>
+                  <div
+                    style={{
+                      background: "#0d171413",
+                      padding: "14px",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: "#9eaabc",
+                        fontSize: "12px",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      MATERIAL COST
+                    </div>
 
-        <strong
-          style={{
-            fontSize: "18px",
-            color: "#ef4444",
-          }}
-        >
-          {responseData.drillDown.materialCost != null
-            ? `₹${Number(
-                responseData.drillDown.materialCost
-              ).toLocaleString("en-IN")}`
-            : "N/A"}
-        </strong>
-      </div>
-    </div>
-  </div>
-)}
+                    <strong
+                      style={{
+                        fontSize: "18px",
+                        color: "#00E6A8",
+                      }}
+                    >
+                      {responseData.drillDown
+                        .materialCost != null
+                        ? formatCurrency(
+                            responseData.drillDown
+                              .materialCost
+                          )
+                        : "N/A"}
+                    </strong>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -708,20 +734,19 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
                 marginBottom: "20px",
               }}
             >
-
-              {/* METRIC */}
-
               <div
-                style={{
-                  background: "#0f172a",
-                  padding: "15px",
-                  borderRadius: "10px",
-                  minWidth: "180px",
-                }}
+               style={{
+  background: "#111614",
+  padding: "15px",
+  borderRadius: "10px",
+  minWidth: "180px",
+  border: "1px solid rgba(0, 230, 168, 0.25)",
+  boxShadow: "0 0 18px rgba(0, 230, 168, 0.08)",
+}}
               >
                 <div
                   style={{
-                    color: "#94a3b8",
+                    color: "#111614",
                     fontSize: "13px",
                   }}
                 >
@@ -737,38 +762,42 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
                 </strong>
               </div>
 
-              {/* ================================================== */}
-          {/* VALUE */}
-          {/* ================================================== */}
+              {responseData.value !==
+                undefined && (
+                <div
+                  style={{
+  background: "#111614",
+  padding: "15px",
+  borderRadius: "10px",
+  minWidth: "180px",
+  border: "1px solid rgba(0, 230, 168, 0.25)",
+  boxShadow: "0 0 18px rgba(0, 230, 168, 0.08)",
+}}
+                >
+                  <div
+                    style={{
+                      color:
+                        "#111614",
 
-          {responseData.value !== undefined && (
-            <div
-              style={{
-                background: "#0f172a",
-                padding: "15px",
-                borderRadius: "10px",
-                minWidth: "180px",
-              }}
-            >
-              <div
-                style={{
-                  color: "#94a3b8",
-                  fontSize: "13px",
-                }}
-              >
-                VALUE
-              </div>
+                      fontSize:
+                        "13px",
+                    }}
+                  >
+                    VALUE
+                  </div>
 
-              <strong
-                style={{
-                  fontSize: "18px",
-                }}
-              >
-                {formatCurrency(responseData.value)}
-              </strong>
-            </div>
-          )}
-
+                  <strong
+                    style={{
+                      fontSize:
+                        "18px",
+                    }}
+                  >
+                    {formatCurrency(
+                      responseData.value
+                    )}
+                  </strong>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -781,13 +810,17 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
       {responseData?.filters && (
         <details
           style={{
-            marginBottom: "15px",
+            marginBottom:
+              "15px",
           }}
         >
           <summary
             style={{
-              cursor: "pointer",
-              fontWeight: "bold",
+              cursor:
+                "pointer",
+
+              fontWeight:
+                "bold",
             }}
           >
             🎯 Applied Filters
@@ -795,10 +828,17 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
 
           <pre
             style={{
-              background: "#0f172a",
-              padding: "12px",
-              borderRadius: "8px",
-              overflowX: "auto",
+              background:
+                "#111614",
+
+              padding:
+                "12px",
+
+              borderRadius:
+                "8px",
+
+              overflowX:
+                "auto",
             }}
           >
             {JSON.stringify(
@@ -811,42 +851,63 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
       )}
 
       {/* ====================================================== */}
-      {/* AGENT EXECUTION STEPS */}
+      {/* AGENT STEPS */}
       {/* ====================================================== */}
 
       {responseData?.agentSteps &&
-        responseData.agentSteps.length > 0 && (
+        responseData.agentSteps
+          .length > 0 && (
           <div
             style={{
-              background: "#1e293b",
-              padding: "16px",
-              borderRadius: "10px",
-              marginBottom: "20px",
+              background:
+                "#083523",
+
+              padding:
+                "16px",
+
+              borderRadius:
+                "10px",
+
+              marginBottom:
+                "20px",
             }}
           >
             <strong>
-              🧠 Agent Execution Steps
+              🧠 Agent Execution
+              Steps
             </strong>
 
             <div
               style={{
-                marginTop: "12px",
+                marginTop:
+                  "12px",
               }}
             >
               {responseData.agentSteps.map(
-                (step, index) => (
+                (
+                  step,
+                  index
+                ) => (
                   <div
-                    key={index}
+                    key={`${step}-${index}`}
                     style={{
-                      padding: "8px 0",
-                      color: "#e2e8f0",
+                      padding:
+                        "8px 0",
+
+                      color:
+                        "#e2e8f0",
                     }}
                   >
                     <span
                       style={{
-                        color: "#22c55e",
-                        fontWeight: "bold",
-                        marginRight: "8px",
+                        color:
+                          "#22c55e",
+
+                        fontWeight:
+                          "bold",
+
+                        marginRight:
+                          "8px",
                       }}
                     >
                       ✓
@@ -867,10 +928,17 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
       {responseData?.governance && (
         <div
           style={{
-            background: "#1e293b",
-            padding: "16px",
-            borderRadius: "10px",
-            marginBottom: "20px",
+            background:
+              "#0c0e0d",
+
+            padding:
+              "16px",
+
+            borderRadius:
+              "10px",
+
+            marginBottom:
+              "20px",
           }}
         >
           <strong>
@@ -879,19 +947,24 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
 
           <div
             style={{
-              marginTop: "12px",
-              lineHeight: "1.8",
+              marginTop:
+                "12px",
+
+              lineHeight:
+                "1.8",
             }}
           >
-
-            {/* QUERY STATUS */}
-
             <div>
-              {responseData.governance.allowed ? (
+              {responseData
+                .governance
+                .allowed ? (
                 <span
                   style={{
-                    color: "#22c55e",
-                    fontWeight: "bold",
+                    color:
+                      "#22c55e",
+
+                    fontWeight:
+                      "bold",
                   }}
                 >
                   ✓ Query Approved
@@ -899,8 +972,11 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
               ) : (
                 <span
                   style={{
-                    color: "#ef4444",
-                    fontWeight: "bold",
+                    color:
+                      "#ef4444",
+
+                    fontWeight:
+                      "bold",
                   }}
                 >
                   ✕ Query Rejected
@@ -908,64 +984,78 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
               )}
             </div>
 
-            {/* REASON */}
-
-            {responseData.governance.reason && (
+            {responseData
+              .governance
+              .reason && (
               <div
                 style={{
-                  color: "#cbd5e1",
-                  marginTop: "6px",
+                  color:
+                    "#a8d7d7",
+
+                  marginTop:
+                    "6px",
                 }}
               >
                 <strong>
                   Reason:
                 </strong>{" "}
-                {responseData.governance.reason}
+                {
+                  responseData
+                    .governance
+                    .reason
+                }
               </div>
             )}
 
-            {/* DETERMINISTIC */}
-
-            {responseData.governance
-              .deterministic !== undefined && (
+            {responseData
+              .governance
+              .deterministic !==
+              undefined && (
               <div
                 style={{
-                  marginTop: "8px",
+                  marginTop:
+                    "8px",
+
                   color:
-                    responseData.governance
+                    responseData
+                      .governance
                       .deterministic
                       ? "#22c55e"
                       : "#f59e0b",
                 }}
               >
-                {responseData.governance
+                {responseData
+                  .governance
                   .deterministic
                   ? "✓ Deterministic execution"
                   : "⚠ Non-deterministic execution"}
               </div>
             )}
 
-            {/* SQL GENERATED BY LLM */}
-
-            {responseData.governance
-              .sqlGeneratedByLLM !== undefined && (
+            {responseData
+              .governance
+              .sqlGeneratedByLLM !==
+              undefined && (
               <div
                 style={{
-                  marginTop: "8px",
+                  marginTop:
+                    "8px",
+
                   color:
-                    responseData.governance
+                    responseData
+                      .governance
                       .sqlGeneratedByLLM
                       ? "#f59e0b"
                       : "#22c55e",
                 }}
               >
-                {responseData.governance
+                {responseData
+                  .governance
                   .sqlGeneratedByLLM
                   ? "⚠ SQL generated by LLM"
                   : "✓ SQL not generated by LLM"}
               </div>
             )}
-
           </div>
         </div>
       )}
@@ -977,79 +1067,104 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
       {responseData?.semanticMetric && (
         <details
           style={{
-            marginBottom: "15px",
+            marginBottom:
+              "15px",
           }}
         >
           <summary
             style={{
-              cursor: "pointer",
-              fontWeight: "bold",
+              cursor:
+                "pointer",
+
+              fontWeight:
+                "bold",
             }}
           >
-            📐 Semantic Metric Definition
+            📐 Semantic Metric
+            Definition
           </summary>
 
           <div
             style={{
-              background: "#0f172a",
-              padding: "12px",
-              borderRadius: "8px",
-              marginTop: "10px",
+              background:
+                "#0D1210",
+
+              padding:
+                "12px",
+
+              borderRadius:
+                "8px",
+
+              marginTop:
+                "10px",
             }}
           >
             <div>
               <strong>
                 Name:
               </strong>{" "}
-              {responseData.semanticMetric.name}
+              {
+                responseData
+                  .semanticMetric
+                  .name
+              }
             </div>
 
-            {responseData.semanticMetric
+            {responseData
+              .semanticMetric
               .description && (
               <div
                 style={{
-                  marginTop: "8px",
+                  marginTop:
+                    "8px",
                 }}
               >
                 <strong>
                   Description:
                 </strong>{" "}
                 {
-                  responseData.semanticMetric
+                  responseData
+                    .semanticMetric
                     .description
                 }
               </div>
             )}
 
-            {responseData.semanticMetric
+            {responseData
+              .semanticMetric
               .formula && (
               <div
                 style={{
-                  marginTop: "8px",
+                  marginTop:
+                    "8px",
                 }}
               >
                 <strong>
                   Formula:
                 </strong>{" "}
                 {
-                  responseData.semanticMetric
+                  responseData
+                    .semanticMetric
                     .formula
                 }
               </div>
             )}
 
-            {responseData.semanticMetric
+            {responseData
+              .semanticMetric
               .aggregation && (
               <div
                 style={{
-                  marginTop: "8px",
+                  marginTop:
+                    "8px",
                 }}
               >
                 <strong>
                   Aggregation:
                 </strong>{" "}
                 {
-                  responseData.semanticMetric
+                  responseData
+                    .semanticMetric
                     .aggregation
                 }
               </div>
@@ -1057,135 +1172,351 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
           </div>
         </details>
       )}
-
       {/* ====================================================== */}
-      {/* LINE CHART */}
-      {/* ====================================================== */}
-
-      {chartData.length > 0 &&
-        responseData?.chartType === "line" && (
-          <div
-            style={{
-              background: "white",
-              padding: "15px",
-              borderRadius: "10px",
-              marginTop: "20px",
-            }}
-          >
-            <h3
-              style={{
-                color: "#111827",
-                textAlign: "center",
-              }}
-            >
-              Monthly Revenue & Profit
-            </h3>
-
-            <ResponsiveContainer
-              width="100%"
-              height={300}
-            >
-              <LineChart
-                data={chartData}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                />
-
-                <XAxis
-                  dataKey={xAxisKey}
-                />
-
-                <YAxis />
-
-                <Tooltip />
-
-                {hasRevenue && (
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#2563eb"
-                    strokeWidth={3}
-                  />
-                )}
-
-                {hasProfit && (
-                  <Line
-                    type="monotone"
-                    dataKey="profit"
-                    stroke="#ef4444"
-                    strokeWidth={3}
-                  />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-      {/* ====================================================== */}
-      {/* BAR CHART */}
+      {/* AI GENERATED CHARTS */}
       {/* ====================================================== */}
 
       {chartData.length > 0 &&
-        responseData?.chartType === "bar" && (
+        (responseData?.chartType === "line" ||
+          responseData?.chartType === "bar") && (
           <div
             style={{
-              background: "white",
-              padding: "15px",
-              borderRadius: "10px",
-              marginTop: "20px",
+              marginTop: "24px",
+              background: "#0D1210",
+              borderRadius: "16px",
+              padding: "24px",
+              width: "100%",
+              boxSizing: "border-box",
+              overflow: "hidden",
+              border: "1px solid rgba(0,230,168,0.18)",
+              boxShadow:
+                "0 10px 30px rgba(0,230,168,0.08)",
             }}
           >
-            <h3
+            {/* CHART HEADER */}
+
+            <div
               style={{
-                color: "#111827",
-                textAlign: "center",
+                marginBottom: "20px",
               }}
             >
-              Business Performance
-            </h3>
-
-            <ResponsiveContainer
-              width="100%"
-              height={300}
-            >
-              <BarChart
-                data={chartData}
+              <div
+                style={{
+                  color: "#00E6A8",
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  marginBottom: "5px",
+                }}
               >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                />
+                AI ANALYSIS
+              </div>
 
-                <XAxis
-                  dataKey={xAxisKey}
-                />
+              <h3
+                style={{
+                  margin: 0,
+                  color: "#F5F7F6",
+                  fontSize: "20px",
+                  fontWeight: 700,
+                }}
+              >
+                {responseData.chartType === "bar"
+                  ? "Business Performance"
+                  : "Business Trend"}
+              </h3>
 
-                <YAxis />
+              <p
+                style={{
+                  margin: "5px 0 0",
+                  color: "#7F8C87",
+                  fontSize: "13px",
+                }}
+              >
+                Visual representation of the
+                requested business data.
+              </p>
+            </div>
 
-                <Tooltip />
+            {/* CHART CONTAINER */}
 
-                {hasRevenue && (
-                  <Bar
-                    dataKey="revenue"
-                    fill="#2563eb"
-                  />
+            <div
+              style={{
+                width: "100%",
+                height: "360px",
+                minWidth: 0,
+                position: "relative",
+              }}
+            >
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+                {responseData.chartType === "line" ? (
+                  <LineChart
+                    key={`ai-line-${chartKey}`}
+                    data={chartData}
+                    margin={{
+                      top: 20,
+                      right: 25,
+                      left: 10,
+                      bottom: 20,
+                    }}
+                  >
+                    <CartesianGrid
+                      horizontal={true}
+                      vertical={false}
+                      stroke="rgba(255, 255, 255, 0.07)"
+                      strokeDasharray="4 6"
+                    />
+
+                    <XAxis
+                      dataKey={xAxisKey}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{
+                        fill: "#F5F7F6",
+                        fontSize: 12,
+                      }}
+                    />
+
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      width={65}
+                      tick={{
+                        fill: "#7F8C87",
+                        fontSize: 11,
+                      }}
+                      tickFormatter={
+                        formatChartValue
+                      }
+                    />
+
+                    <Tooltip
+                      contentStyle={{
+                        background: "#080D0B",
+                        border:
+                          "1px solid rgba(0,230,168,0.25)",
+                        borderRadius: "10px",
+                        color: "#ffffff",
+                        boxShadow:
+                          "0 10px 25px rgba(0,0,0,0.2)",
+                      }}
+                      formatter={(value) =>
+                        formatCurrency(
+                          Number(value)
+                        )
+                      }
+                    />
+
+                    {(hasRevenue ||
+                      hasProfit) && (
+                      <Legend
+                        wrapperStyle={{
+                          paddingTop: "10px",
+                          fontSize: "12px",
+                        }}
+                      />
+                    )}
+
+                    {hasRevenue && (
+                      <Line
+                        type="monotone"
+                        dataKey="revenue"
+                        name="Revenue"
+                        stroke="#00E6A8"
+                        strokeWidth={3}
+                        dot={{
+                          r: 4,
+                          fill: "#00E6A8",
+                          strokeWidth: 0,
+                        }}
+                        activeDot={{
+                          r: 6,
+                        }}
+                        isAnimationActive={false}
+                        connectNulls
+                      />
+                    )}
+
+                    {hasProfit && (
+                      <Line
+                        type="monotone"
+                        dataKey="profit"
+                        name="Profit"
+                        stroke="#00E6A8"
+                        strokeWidth={3}
+                        dot={{
+                          r: 4,
+                          fill: "#00E6A8",
+                          strokeWidth: 0,
+                        }}
+                        activeDot={{
+                          r: 6,
+                        }}
+                        isAnimationActive={false}
+                        connectNulls
+                      />
+                    )}
+                  </LineChart>
+                ) : (
+                  <BarChart
+                    key={`ai-bar-${chartKey}`}
+                    data={chartData}
+                    margin={{
+                      top: 20,
+                      right: 25,
+                      left: 10,
+                      bottom: 20,
+                    }}
+                    barCategoryGap="28%"
+                    barGap={8}
+                  >
+                    <CartesianGrid
+                      horizontal={true}
+                      vertical={false}
+                      stroke="rgba(255, 255, 255, 0.07)"
+                      strokeDasharray="4 6"
+                    />
+
+                    <XAxis
+                      dataKey={xAxisKey}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{
+                        fill: "#F5F7F6",
+                        fontSize: 12,
+                        fontWeight: 500,
+                      }}
+                      dy={8}
+                    />
+
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      width={65}
+                      tick={{
+                        fill: "#7F8C87",
+                        fontSize: 11,
+                      }}
+                      tickFormatter={
+                        formatChartValue
+                      }
+                    />
+
+                    <Tooltip
+                      cursor={{
+                        fill:
+                          "rgba(0,230,168,0.05)",
+                      }}
+                      contentStyle={{
+                        background: "#080D0B",
+                        border:
+                          "1px solid rgba(0,230,168,0.25)",
+                        borderRadius: "10px",
+                        color: "#ffffff",
+                        boxShadow:
+                          "0 10px 25px rgba(0,0,0,0.2)",
+                      }}
+                      formatter={(value) =>
+                        formatCurrency(
+                          Number(value)
+                        )
+                      }
+                    />
+
+                    <Legend
+                      wrapperStyle={{
+                        paddingTop: "10px",
+                        fontSize: "12px",
+                      }}
+                    />
+
+                    {hasRevenue && (
+                      <Bar
+                        dataKey="revenue"
+                        name="Revenue"
+                        fill="#00E6A8"
+                        radius={[
+                          8,
+                          8,
+                          2,
+                          2,
+                        ]}
+                        maxBarSize={55}
+                        isAnimationActive={false}
+                      />
+                    )}
+
+                    {hasCost && (
+                      <Bar
+                        dataKey="cost"
+                        name="Cost"
+                        fill="#f59e0b"
+                        radius={[
+                          8,
+                          8,
+                          2,
+                          2,
+                        ]}
+                        maxBarSize={55}
+                        isAnimationActive={false}
+                      />
+                    )}
+
+                    {hasShippingCost && (
+  <Bar
+    dataKey="shippingCost"
+    name="Shipping Cost"
+    fill="#22c55e"
+    radius={[
+      8,
+      8,
+      2,
+      2,
+    ]}
+    maxBarSize={55}
+    isAnimationActive={false}
+  />
+)}
+
+{hasMaterialCost && (
+  <Bar
+    dataKey="materialCost"
+    name="Material Cost"
+    fill="#00E6A8"
+    radius={[
+      8,
+      8,
+      2,
+      2,
+    ]}
+    maxBarSize={55}
+    isAnimationActive={false}
+  />
+)}
+
+
+                    {hasProfit && (
+                      <Bar
+                        dataKey="profit"
+                        name="Profit"
+                        fill="#00E6A8"
+                        radius={[
+                          8,
+                          8,
+                          2,
+                          2,
+                        ]}
+                        maxBarSize={55}
+                        isAnimationActive={false}
+                      />
+                    )}
+                  </BarChart>
                 )}
-
-                {hasCost && (
-                  <Bar
-                    dataKey="cost"
-                    fill="#f59e0b"
-                  />
-                )}
-
-                {hasProfit && (
-                  <Bar
-                    dataKey="profit"
-                    fill="#22c55e"
-                  />
-                )}
-              </BarChart>
-            </ResponsiveContainer>
+              </ResponsiveContainer>
+            </div>
           </div>
         )}
 
@@ -1211,11 +1542,12 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
           <div
             style={{
               marginTop: "10px",
-              background: "#0f172a",
+              background: "#080D0B",
               padding: "12px",
               borderRadius: "8px",
               fontFamily: "monospace",
               overflowX: "auto",
+              color: "#e2e8f0",
             }}
           >
             {responseData.apiCall}
@@ -1245,11 +1577,12 @@ console.log("MATERIAL:", data?.drillDown?.materialCost);
           <pre
             style={{
               marginTop: "10px",
-              background: "#0f172a",
+              background: "#080D0B",
               padding: "12px",
               borderRadius: "8px",
               overflowX: "auto",
               whiteSpace: "pre-wrap",
+              color: "#e2e8f0",
             }}
           >
             <code>

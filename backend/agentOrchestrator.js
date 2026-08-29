@@ -97,51 +97,7 @@ function extractFilters(question) {
       break;
     }
   }
-
-  // MONTH
-  const months = {
-    january: 1,
-    jan: 1,
-    february: 2,
-    feb: 2,
-    march: 3,
-    mar: 3,
-    april: 4,
-    apr: 4,
-    may: 5,
-    june: 6,
-    jun: 6,
-    july: 7,
-    jul: 7,
-    august: 8,
-    aug: 8,
-    september: 9,
-    sep: 9,
-    october: 10,
-    oct: 10,
-    november: 11,
-    nov: 11,
-    december: 12,
-    dec: 12
-  };
-
-  for (const [name, number] of Object.entries(months)) {
-    if (q.includes(name)) {
-      filters.month = String(number);
-      break;
-    }
-  }
-
-  if (!filters.month) {
-    const numericMonth =
-      q.match(/\bmonth\s*(1[0-2]|[1-9])\b/);
-
-    if (numericMonth) {
-      filters.month = numericMonth[1];
-    }
-  }
-
-  return filters;
+return filters;
 }
 
 // ============================================================

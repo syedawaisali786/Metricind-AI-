@@ -6,10 +6,106 @@
 import businessData from "./data.js";
 
 // ============================================================
+// SNOWFLAKE / DATA SOURCE NORMALIZATION
+// ============================================================
+
+function setBusinessData(rows = []) {
+  businessData.splice(
+    0,
+    businessData.length,
+    ...rows.map((row) => {
+
+      const shippingCost = Number(
+        row.SHIPPING_COST ??
+        row.shipping_cost ??
+        row.shippingCost ??
+        0
+      );
+
+      const materialCost = Number(
+        row.MATERIAL_COST ??
+        row.material_cost ??
+        row.materialCost ??
+        0
+      );
+
+      return {
+        id:
+          row.ID ??
+          row.id,
+
+        date:
+          row.DATE ??
+          row.date,
+
+        country:
+          row.COUNTRY ??
+          row.country,
+
+        region:
+          row.REGION ??
+          row.region,
+
+        product:
+          row.PRODUCT ??
+          row.product,
+
+        orders: Number(
+          row.ORDERS ??
+          row.orders ??
+          0
+        ),
+
+        revenue: Number(
+          row.REVENUE ??
+          row.revenue ??
+          0
+        ),
+
+        cost: Number(
+          row.COST ??
+          row.cost ??
+          0
+        ),
+
+        // ======================================================
+        // KEEP BOTH NAMING CONVENTIONS
+        // ======================================================
+
+        shippingCost,
+
+        shipping_cost:
+          shippingCost,
+
+        materialCost,
+
+        material_cost:
+          materialCost,
+      };
+    })
+  );
+
+  console.log(
+    `✅ Semantic Layer loaded ${businessData.length} Snowflake rows`
+  );
+
+  return businessData;
+}
+
+function getBusinessData() {
+  return businessData;
+}
+
+// ============================================================
 // GOVERNED METRICS
 // ============================================================
 
 const metrics = {
+
+  // ==========================================================
+  // REVENUE
+  // ==========================================================
+
   revenue: {
     name: "Total Revenue",
     description: "Total business revenue",
@@ -21,8 +117,12 @@ const metrics = {
         (sum, row) =>
           sum + Number(row.revenue || 0),
         0
-      )
+      ),
   },
+
+  // ==========================================================
+  // COST
+  // ==========================================================
 
   cost: {
     name: "Total Cost",
@@ -35,8 +135,58 @@ const metrics = {
         (sum, row) =>
           sum + Number(row.cost || 0),
         0
-      )
+      ),
   },
+
+  // ==========================================================
+  // SHIPPING COST
+  // ==========================================================
+
+  shippingCost: {
+    name: "Shipping Cost",
+    description: "Total shipping cost",
+    type: "number",
+    aggregation: "SUM",
+
+    calculate: (rows) =>
+      rows.reduce(
+        (sum, row) =>
+          sum +
+          Number(
+            row.shippingCost ??
+            row.shipping_cost ??
+            0
+          ),
+        0
+      ),
+  },
+
+  // ==========================================================
+  // MATERIAL COST
+  // ==========================================================
+
+  materialCost: {
+    name: "Material Cost",
+    description: "Total material cost",
+    type: "number",
+    aggregation: "SUM",
+
+    calculate: (rows) =>
+      rows.reduce(
+        (sum, row) =>
+          sum +
+          Number(
+            row.materialCost ??
+            row.material_cost ??
+            0
+          ),
+        0
+      ),
+  },
+
+  // ==========================================================
+  // PROFIT
+  // ==========================================================
 
   profit: {
     name: "Total Profit",
@@ -51,8 +201,12 @@ const metrics = {
           Number(row.revenue || 0) -
           Number(row.cost || 0),
         0
-      )
+      ),
   },
+
+  // ==========================================================
+  // MARGIN
+  // ==========================================================
 
   margin: {
     name: "Profit Margin",
@@ -61,28 +215,36 @@ const metrics = {
     aggregation: "CALCULATED",
 
     calculate: (rows) => {
-      const revenue = rows.reduce(
-        (sum, row) =>
-          sum + Number(row.revenue || 0),
-        0
-      );
 
-      const cost = rows.reduce(
-        (sum, row) =>
-          sum + Number(row.cost || 0),
-        0
-      );
+      const revenue =
+        rows.reduce(
+          (sum, row) =>
+            sum + Number(row.revenue || 0),
+          0
+        );
+
+      const cost =
+        rows.reduce(
+          (sum, row) =>
+            sum + Number(row.cost || 0),
+          0
+        );
 
       if (revenue === 0) {
         return 0;
       }
 
       return (
-        ((revenue - cost) / revenue) *
+        ((revenue - cost) /
+          revenue) *
         100
       );
-    }
+    },
   },
+
+  // ==========================================================
+  // ORDERS
+  // ==========================================================
 
   orders: {
     name: "Total Orders",
@@ -95,8 +257,8 @@ const metrics = {
         (sum, row) =>
           sum + Number(row.orders || 0),
         0
-      )
-  }
+      ),
+  },
 };
 
 // ============================================================
@@ -104,35 +266,36 @@ const metrics = {
 // ============================================================
 
 const dimensions = {
+
   time: {
     name: "Time",
     field: "date",
-    type: "date"
+    type: "date",
   },
 
   geography: {
     name: "Geography",
     field: "country",
-    type: "string"
+    type: "string",
   },
 
   country: {
     name: "Country",
     field: "country",
-    type: "string"
+    type: "string",
   },
 
   region: {
     name: "Region",
     field: "region",
-    type: "string"
+    type: "string",
   },
 
   product: {
     name: "Product",
     field: "product",
-    type: "string"
-  }
+    type: "string",
+  },
 };
 
 // ============================================================
@@ -140,13 +303,15 @@ const dimensions = {
 // ============================================================
 
 function getMetric(metricName) {
+
   if (!metricName) {
     return null;
   }
 
   return (
     metrics[
-      String(metricName).toLowerCase()
+      String(metricName)
+        .toLowerCase()
     ] || null
   );
 }
@@ -156,13 +321,15 @@ function getMetric(metricName) {
 // ============================================================
 
 function getDimension(dimensionName) {
+
   if (!dimensionName) {
     return null;
   }
 
   return (
     dimensions[
-      String(dimensionName).toLowerCase()
+      String(dimensionName)
+        .toLowerCase()
     ] || null
   );
 }
@@ -175,6 +342,7 @@ function calculateMetric(
   metricName,
   rows = businessData
 ) {
+
   const metric =
     getMetric(metricName);
 
@@ -188,29 +356,17 @@ function calculateMetric(
 }
 
 // ============================================================
-// HELPER - GET MONTH FROM ROW
-// ============================================================
-//
-// Supports:
-// 1. row.month
-// 2. row.date
-//
-// Example:
-// date = "2026-02-15"
-// result = 2
-//
+// GET MONTH FROM ROW
 // ============================================================
 
 function getRowMonth(row) {
-  // ----------------------------------------------------------
-  // If dataset already contains a month field
-  // ----------------------------------------------------------
 
   if (
     row.month !== undefined &&
     row.month !== null &&
     String(row.month).trim() !== ""
   ) {
+
     const monthNumber =
       Number(row.month);
 
@@ -222,10 +378,6 @@ function getRowMonth(row) {
       return monthNumber;
     }
   }
-
-  // ----------------------------------------------------------
-  // Otherwise use date
-  // ----------------------------------------------------------
 
   if (
     row.date === undefined ||
@@ -241,10 +393,7 @@ function getRowMonth(row) {
     return null;
   }
 
-  // ----------------------------------------------------------
-  // Handle YYYY-MM-DD safely
-  // ----------------------------------------------------------
-
+  // YYYY-MM-DD
   const directMatch =
     dateString.match(
       /^(\d{4})-(\d{1,2})-(\d{1,2})/
@@ -256,10 +405,7 @@ function getRowMonth(row) {
     );
   }
 
-  // ----------------------------------------------------------
-  // Handle DD-MM-YYYY
-  // ----------------------------------------------------------
-
+  // DD-MM-YYYY
   const reverseMatch =
     dateString.match(
       /^(\d{1,2})-(\d{1,2})-(\d{4})/
@@ -270,10 +416,6 @@ function getRowMonth(row) {
       reverseMatch[2]
     );
   }
-
-  // ----------------------------------------------------------
-  // Fallback to JavaScript Date
-  // ----------------------------------------------------------
 
   const parsedDate =
     new Date(dateString);
@@ -294,29 +436,12 @@ function getRowMonth(row) {
 // ============================================================
 // FILTER DATA
 // ============================================================
-//
-// Supported filters:
-//
-// country
-// region
-// product
-// month
-//
-// All filters are combined using AND logic.
-//
-// Example:
-//
-// {
-//   country: "India",
-//   region: "Asia",
-//   product: "Monitor",
-//   month: "2"
-// }
-//
-// ============================================================
 
 function filterData(filters = {}) {
-  let rows = [...businessData];
+
+  let rows = [
+    ...businessData,
+  ];
 
   // ==========================================================
   // COUNTRY
@@ -327,6 +452,7 @@ function filterData(filters = {}) {
     filters.country !== null &&
     String(filters.country).trim() !== ""
   ) {
+
     const country =
       String(filters.country)
         .trim()
@@ -349,6 +475,7 @@ function filterData(filters = {}) {
     filters.region !== null &&
     String(filters.region).trim() !== ""
   ) {
+
     const region =
       String(filters.region)
         .trim()
@@ -371,6 +498,7 @@ function filterData(filters = {}) {
     filters.product !== null &&
     String(filters.product).trim() !== ""
   ) {
+
     const product =
       String(filters.product)
         .trim()
@@ -393,12 +521,12 @@ function filterData(filters = {}) {
     filters.month !== null &&
     String(filters.month).trim() !== ""
   ) {
+
     const requestedMonth =
       Number(
         String(filters.month).trim()
       );
 
-    // Only apply valid month numbers
     if (
       Number.isInteger(
         requestedMonth
@@ -406,6 +534,7 @@ function filterData(filters = {}) {
       requestedMonth >= 1 &&
       requestedMonth <= 12
     ) {
+
       rows = rows.filter(
         (row) =>
           getRowMonth(row) ===
@@ -421,11 +550,24 @@ function filterData(filters = {}) {
 // GROUP DATA
 // ============================================================
 
-function groupBy(rows, field) {
+function groupBy(
+  rows,
+  field
+) {
+
   const groups = {};
 
   rows.forEach((row) => {
+
     const key = row[field];
+
+    if (
+      key === undefined ||
+      key === null ||
+      String(key).trim() === ""
+    ) {
+      return;
+    }
 
     if (!groups[key]) {
       groups[key] = [];
@@ -444,15 +586,18 @@ function groupBy(rows, field) {
 function monthlyAnalytics(
   filters = {}
 ) {
+
   const filteredRows =
     filterData(filters);
 
   const groups = {};
 
   filteredRows.forEach((row) => {
+
     let monthKey;
 
     if (row.date) {
+
       const dateString =
         String(row.date);
 
@@ -462,6 +607,7 @@ function monthlyAnalytics(
         );
 
       if (match) {
+
         monthKey =
           `${match[1]}-${String(
             match[2]
@@ -470,6 +616,7 @@ function monthlyAnalytics(
     }
 
     if (!monthKey) {
+
       const month =
         getRowMonth(row);
 
@@ -488,41 +635,46 @@ function monthlyAnalytics(
 
   return Object.entries(
     groups
-  ).map(([month, rows]) => ({
-    month,
+  )
+    .sort(([a], [b]) =>
+      a.localeCompare(b)
+    )
+    .map(([month, rows]) => ({
 
-    orders:
-      calculateMetric(
-        "orders",
-        rows
-      ),
+      month,
 
-    revenue:
-      calculateMetric(
-        "revenue",
-        rows
-      ),
-
-    cost:
-      calculateMetric(
-        "cost",
-        rows
-      ),
-
-    profit:
-      calculateMetric(
-        "profit",
-        rows
-      ),
-
-    margin:
-      Number(
+      orders:
         calculateMetric(
-          "margin",
+          "orders",
           rows
-        ).toFixed(2)
-      )
-  }));
+        ),
+
+      revenue:
+        calculateMetric(
+          "revenue",
+          rows
+        ),
+
+      cost:
+        calculateMetric(
+          "cost",
+          rows
+        ),
+
+      profit:
+        calculateMetric(
+          "profit",
+          rows
+        ),
+
+      margin:
+        Number(
+          calculateMetric(
+            "margin",
+            rows
+          ).toFixed(2)
+        ),
+    }));
 }
 
 // ============================================================
@@ -532,6 +684,7 @@ function monthlyAnalytics(
 function countryAnalytics(
   filters = {}
 ) {
+
   const filteredRows =
     filterData(filters);
 
@@ -544,6 +697,7 @@ function countryAnalytics(
   return Object.entries(
     groups
   ).map(([country, rows]) => ({
+
     country,
 
     orders:
@@ -576,7 +730,7 @@ function countryAnalytics(
           "margin",
           rows
         ).toFixed(2)
-      )
+      ),
   }));
 }
 
@@ -587,6 +741,7 @@ function countryAnalytics(
 function regionAnalytics(
   filters = {}
 ) {
+
   const filteredRows =
     filterData(filters);
 
@@ -599,6 +754,7 @@ function regionAnalytics(
   return Object.entries(
     groups
   ).map(([region, rows]) => ({
+
     region,
 
     orders:
@@ -631,7 +787,7 @@ function regionAnalytics(
           "margin",
           rows
         ).toFixed(2)
-      )
+      ),
   }));
 }
 
@@ -642,6 +798,7 @@ function regionAnalytics(
 function productAnalytics(
   filters = {}
 ) {
+
   const filteredRows =
     filterData(filters);
 
@@ -654,6 +811,7 @@ function productAnalytics(
   return Object.entries(
     groups
   ).map(([product, rows]) => ({
+
     product,
 
     orders:
@@ -686,13 +844,12 @@ function productAnalytics(
           "margin",
           rows
         ).toFixed(2)
-      )
+      ),
   }));
 }
 
 // ============================================================
 // REGION → PRODUCT DRILL-DOWN
-// RESPECTS ALL ACTIVE FILTERS
 // ============================================================
 
 function productAnalyticsByRegion(
@@ -704,25 +861,13 @@ function productAnalyticsByRegion(
     return [];
   }
 
-  // ----------------------------------------------------------
-  // STEP 1: COMBINE REGION WITH ACTIVE FILTERS
-  // ----------------------------------------------------------
-
   const filters = {
     ...additionalFilters,
-    region
+    region,
   };
-
-  // ----------------------------------------------------------
-  // STEP 2: FILTER BUSINESS DATA
-  // ----------------------------------------------------------
 
   const regionRows =
     filterData(filters);
-
-  // ----------------------------------------------------------
-  // STEP 3: GROUP BY PRODUCT
-  // ----------------------------------------------------------
 
   const groups =
     groupBy(
@@ -730,11 +875,9 @@ function productAnalyticsByRegion(
       "product"
     );
 
-  // ----------------------------------------------------------
-  // STEP 4: CALCULATE GOVERNED METRICS
-  // ----------------------------------------------------------
-
-  return Object.entries(groups).map(
+  return Object.entries(
+    groups
+  ).map(
     ([product, rows]) => ({
 
       region,
@@ -771,7 +914,7 @@ function productAnalyticsByRegion(
             "margin",
             rows
           ).toFixed(2)
-        )
+        ),
     })
   );
 }
@@ -792,5 +935,7 @@ export {
   countryAnalytics,
   regionAnalytics,
   productAnalytics,
-  productAnalyticsByRegion
+  productAnalyticsByRegion,
+  setBusinessData,
+  getBusinessData,
 };
